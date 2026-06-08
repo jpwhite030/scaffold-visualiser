@@ -6,7 +6,21 @@
       "PowerShell($n = git config --global user.name; $e = git config --global user.email; \"name=[$n]\"; \"email=[$e]\")",
       "Bash(git init *)",
       "Bash(git config *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git check-ignore *)",
+      "Bash(git commit -q -m 'Initial commit: scaffold visualiser *)",
+      "Bash(git remote *)",
+      "Bash(ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -T git@github.com)",
+      "Read(//c/Users/jack/.ssh/**)",
+      "Bash(ssh-keygen -t ed25519 -C \"jack@skelscaff.com.au\" -f ~/.ssh/id_ed25519 -N \"\")",
+      "Bash(git push *)",
+      "Bash(openssl rand *)",
+      "Bash(echo \"AUTH_SECRET=$\\(openssl rand -base64 32\\)\")",
+      "Bash(echo \"DEFAULT_PASSWORD=$\\(openssl rand -base64 9)",
+      "Bash(npm run *)",
+      "Bash(node -e \"process.env.AUTH_SECRET='Bzl+gNGdkUSA2AqakpGwwnAWNNuBTZuBDSjkhtqOER8=';const c=require\\('node:crypto'\\);const s=process.env.AUTH_SECRET;const enc=Buffer.from\\('admin.'+\\(Date.now\\(\\)+86400000\\)\\).toString\\('base64url'\\);const sig=c.createHmac\\('sha256',s\\).update\\(enc\\).digest\\('base64url'\\);console.log\\(enc+'.'+sig\\)\")",
+      "Bash(curl -s -o /dev/null -w 'status=%{http_code}\\\\n' --cookie sv_session=__TRACKED_VAR__ http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"status=%{http_code} location=%{redirect_url}\\\\n\" --cookie \"sv_session=tampered.value\" http://localhost:3000/)"
     ]
   }
 }
