@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh auth *)",
+      "PowerShell($g = Get-Command gh -ErrorAction SilentlyContinue; if \\($g\\) { \"gh: $\\($g.Source\\)\" } else { \"gh: not found\" }; git config --global user.name; git config --global user.email)",
+      "PowerShell($n = git config --global user.name; $e = git config --global user.email; \"name=[$n]\"; \"email=[$e]\")",
+      "Bash(git init *)",
+      "Bash(git config *)",
+      "Bash(git add *)"
+    ]
+  }
+}
