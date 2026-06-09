@@ -289,30 +289,51 @@ function FootprintEditor({ footprint, imageDataUrl, worldWidth, worldDepth, onCh
     ((z / safeD + 0.5) * (1 - 2 * PAD) + PAD) * VH,
   ];
 
-  const handlePointerMove = (e: React.PointerEvent, idx: number) => {
-    if (dragIdxRef.current !== idx) return;
-    const svg = svgRef.current;
-    if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    const VHc = VHRef.current;
-    // Clamp the dot to stay fully on-screen (R = dragging dot radius) so it can't
-    // be dragged past an edge, clipped by the container, and lost.
-    const R = 24;
-    const sx = Math.max(R, Math.min(VW  - R, ((e.clientX - rect.left) / rect.width)  * VW));
-    const sy = Math.max(R, Math.min(VHc - R, ((e.clientY - rect.top)  / rect.height) * VHc));
-    const wx = ((sx / VW   - PAD) / (1 - 2 * PAD) - 0.5) * safeWRef.current;
-    const wz = ((sy / VHc  - PAD) / (1 - 2 * PAD) - 0.5) * safeDRef.current;
-    // Only reject a near-exact overlap (would make a zero-length edge); the old
-    // 0.5 m guard blocked legitimate placements near other corners.
-    const tooClose = footprintRef.current.some(
-      ([ox, oz], i) => i !== idx && Math.hypot(ox - wx, oz - wz) < 0.05
-    );
-    if (!tooClose) {
-      onChangeRef.current(
-        footprintRef.current.map((pt, i) => (i === idx ? [wx, wz] : pt) as [number, number])
+  // Drag is tracked with window-level pointer listeners (attached once) rather
+  // than per-dot pointer capture, which is fragile across React re-renders and
+  // varies by device/trackpad/touchscreen. The handlers read refs only, so they
+  // never go stale. This is what stops the "rubberband / snap back" behaviour.
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      const idx = dragIdxRef.current;
+      if (idx === null) return;
+      const svg = svgRef.current;
+      if (!svg) return;
+      e.preventDefault();
+      const rect = svg.getBoundingClientRect();
+      const VHc = VHRef.current;
+      // Clamp the dot to stay fully on-screen (R = dragging dot radius) so it
+      // can't be dragged past an edge, clipped by the container, and lost.
+      const R = 24;
+      const sx = Math.max(R, Math.min(VW  - R, ((e.clientX - rect.left) / rect.width)  * VW));
+      const sy = Math.max(R, Math.min(VHc - R, ((e.clientY - rect.top)  / rect.height) * VHc));
+      const wx = ((sx / VW   - PAD) / (1 - 2 * PAD) - 0.5) * safeWRef.current;
+      const wz = ((sy / VHc  - PAD) / (1 - 2 * PAD) - 0.5) * safeDRef.current;
+      // Only reject a near-exact overlap (would make a zero-length edge).
+      const tooClose = footprintRef.current.some(
+        ([ox, oz], i) => i !== idx && Math.hypot(ox - wx, oz - wz) < 0.05
       );
-    }
-  };
+      if (!tooClose) {
+        onChangeRef.current(
+          footprintRef.current.map((pt, i) => (i === idx ? [wx, wz] : pt) as [number, number])
+        );
+      }
+    };
+    const onUp = () => {
+      if (dragIdxRef.current !== null) {
+        dragIdxRef.current = null;
+        setDragIdx(null);
+      }
+    };
+    window.addEventListener('pointermove', onMove, { passive: false });
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, []);
 
   const pts      = footprint.map(([x, z]) => toSvg(x, z).join(',')).join(' ');
   const showImage = imageDataUrl && !imageDataUrl.startsWith('data:application/pdf');
@@ -391,14 +412,8 @@ function FootprintEditor({ footprint, imageDataUrl, worldWidth, worldDepth, onCh
               style={{ cursor: dragIdx !== null ? 'grabbing' : 'grab', touchAction: 'none' }}
               onPointerDown={e => {
                 e.preventDefault();
-                e.currentTarget.setPointerCapture(e.pointerId);
                 dragIdxRef.current = i;
                 setDragIdx(i);
-              }}
-              onPointerMove={e => handlePointerMove(e, i)}
-              onPointerUp={() => {
-                dragIdxRef.current = null;
-                setDragIdx(null);
               }}
               onDoubleClick={e => {
                 e.preventDefault();
