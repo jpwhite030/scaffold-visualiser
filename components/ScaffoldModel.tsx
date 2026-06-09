@@ -514,6 +514,24 @@ function buildScaffold(data: BuildingData) {
     }
   }
 
+  // Roof-edge protection: guardrails on all four sides of the tower top. Each
+  // standard extends a rail's height above the top deck (the posts), with a top
+  // and mid rail running right around the perimeter.
+  for (const fb of [0, 1]) for (const fa of [0, 1]) {
+    const [bx, bz] = tp(fa, fb);
+    tubes.push({ x: bx, y: stairH + RAIL_HI / 2, z: bz, length: RAIL_HI, rot: [0, 0, 0] });
+  }
+  for (const ry of [RAIL_LO, RAIL_HI]) {
+    for (const fb of [0, 1]) {
+      const [a0x, a0z] = tp(0, fb), [a1x, a1z] = tp(1, fb);
+      tubes.push({ x: (a0x + a1x) / 2, y: stairH + ry, z: (a0z + a1z) / 2, length: TW_GOING, rot: uRot, r: RAIL_R });
+    }
+    for (const fa of [0, 1]) {
+      const [b0x, b0z] = tp(fa, 0), [b1x, b1z] = tp(fa, 1);
+      tubes.push({ x: (b0x + b1x) / 2, y: stairH + ry, z: (b0z + b1z) / 2, length: TW_DEPTH, rot: nRot, r: RAIL_R });
+    }
+  }
+
   if (accessType === 'ladder') {
     // Vertical ladder on the tower's outer face.
     const [cx0, cz0] = tp(0.5, 1);
