@@ -53,7 +53,8 @@
       "Bash(rm -f _favicon_candidate.png)",
       "Bash(git commit -q -m 'Add Scaffold Visualiser logo: favicon + on-site branding *)",
       "Bash(git commit -q -m 'Scaffold: kickboards >2m, stair/ladder access selection *)",
-      "Bash(git commit -q -m 'Scaffold: outer-only kickboards every deck; full-bay zig-zag stair tower *)"
+      "Bash(git commit -q -m 'Scaffold: outer-only kickboards every deck; full-bay zig-zag stair tower *)",
+      "Bash(git commit -q -m 'Access: put stair/ladder inside the scaffold corridor \\(no projecting tower\\) *)"
     ]
   }
 }
