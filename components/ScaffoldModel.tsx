@@ -23,8 +23,6 @@ const RAIL_HI = 1.0;
 const KB_H = 0.15;   // 150 mm standard toe-board height
 const KB_T = 0.025;  // board thickness
 
-// Access stair flight spans a full standard bay.
-const STAIR_GOING = 2.4;  // horizontal run of each stair flight (one bay)
 
 // ── Colours — muted Kwikstage palette ────────────────────────────────────────
 const KS_TUBE    = '#607898';   // muted steel-blue — the Kwikstage body colour
@@ -266,13 +264,6 @@ function buildScaffold(data: BuildingData) {
   const rosettes: RosettePos[]  = [];
   const basePts: [number, number][] = [];
 
-  // Access (stair/ladder) lives in the scaffold corridor along edge 0, starting
-  // at corner 0. The flat working deck is suppressed there so the stairs aren't
-  // overlapped by a deck.
-  const accessType = data.access_type ?? 'stair';
-  const edge0Len = Math.hypot(oPoly[1][0] - oPoly[0][0], oPoly[1][1] - oPoly[0][1]) || 1;
-  const ACCESS_GOING = Math.min(STAIR_GOING, edge0Len * 0.92);
-
   for (let ei = 0; ei < nEdges; ei++) {
     const ei1 = (ei + 1) % nEdges;
 
@@ -415,16 +406,12 @@ function buildScaffold(data: BuildingData) {
     const plankW  = PLAT_W / PLANK_COUNT;
     const plankGap = 0.006;
 
-    let goAccum = 0;   // distance along this edge from its start corner
     for (let j = 0; j < numBays; j++) {
       const [ox1, oz1] = oPts[j], [ox2, oz2] = oPts[j + 1];
       const [ix1, iz1] = iPts[j], [ix2, iz2] = iPts[j + 1];
       const ocx  = (ox1 + ox2) / 2, ocz = (oz1 + oz2) / 2;
       const icx  = (ix1 + ix2) / 2, icz = (iz1 + iz2) / 2;
       const bLen = Math.hypot(ox2 - ox1, oz2 - oz1);
-      // This bay carries the stair access — no flat deck here.
-      const inAccess = ei === 0 && accessType === 'stair' && goAccum < ACCESS_GOING - 0.01;
-      goAccum += bLen;
 
       // Per-bay top deck — 500 mm steps from corner, or flat topDeckY on eave faces
       const bayTopY = bayTopYs[j];
@@ -442,7 +429,7 @@ function buildScaffold(data: BuildingData) {
         tubes.push({ x: icx, y, z: icz, length: bLen, rot });
       }
 
-      if (!inAccess) for (const y of bayLiftYs) {
+      for (const y of bayLiftYs) {
         const midX = (ocx + icx) / 2, midZ = (ocz + icz) / 2;
         for (let b = 0; b < PLANK_COUNT; b++) {
           const offset = (b - (PLANK_COUNT - 1) / 2) * plankW;
@@ -462,8 +449,7 @@ function buildScaffold(data: BuildingData) {
         tubes.push({ x: ocx, y: y + RAIL_HI, z: ocz, length: bLen, rot, r: RAIL_R });
       }
 
-      // No face braces in the access bay — they'd cut straight through the stairs.
-      const numBraceLevels = inAccess ? 0 : Math.max(1, Math.ceil(bayTopY / LIFT));
+      const numBraceLevels = Math.max(1, Math.ceil(bayTopY / LIFT));
       for (let li = 0; li < numBraceLevels; li++) {
         const yBot = li * LIFT;
         const yTop = Math.min((li + 1) * LIFT, bayTopY);
@@ -479,65 +465,90 @@ function buildScaffold(data: BuildingData) {
     }
   }
 
-  // ── Access at corner 0 — stairs/ladder inside the scaffold corridor ────────
-  // Lives between the inner and outer standards along edge 0 (against the wall),
-  // so it never projects out and clashes with the perimeter scaffold.
+  // ── Access tower — a separate 2.4 m × 1.2 m bay built OFF the run ───────────
+  // The main scaffold run stays clean and continuous; the tower attaches to its
+  // OUTER face and projects straight out (perpendicular to the wall), with the
+  // zig-zag stair (or a ladder) inside it.
+  const accessType = data.access_type ?? 'stair';
   const maxEave = Math.max(...Array.from({ length: nEdges }, (_, i) => faceH(data, i)));
   const stairH  = Math.max(LIFT, maxEave - 1.0);
   const levels  = Math.max(1, Math.ceil(stairH / LIFT));
+  const TW_GOING = 2.4, TW_DEPTH = 1.2;   // along the wall × projecting out
+  const stairRYs = Array.from({ length: Math.ceil(stairH / 0.5) }, (_, i) => (i + 1) * 0.5)
+                    .filter(y => y <= stairH + 0.01);
 
+  // Frame along edge 0: u along the wall, n the outward normal (away from building).
   const auX = oPoly[1][0] - oPoly[0][0], auZ = oPoly[1][1] - oPoly[0][1];
   const auL = Math.hypot(auX, auZ) || 1;
-  const ux = auX / auL, uz = auZ / auL;            // along the wall
-  const uRot = hRot(ux, uz);
-  const Si = iPoly[0], So = oPoly[0];              // inner/outer start at corner 0
-  const dvx = So[0] - Si[0], dvz = So[1] - Si[1];  // depth vector, inner → outer
-  const depthLen = Math.hypot(dvx, dvz) || PLAT_W;
-  const dAngle = hAngle(dvx / depthLen, dvz / depthLen);
+  const ux = auX / auL, uz = auZ / auL;
+  const nx = uz, nz = -ux;                 // outward normal of edge 0
+  const uRot = hRot(ux, uz), nRot = hRot(nx, nz);
+  const nAngle = hAngle(nx, nz);
 
-  // corridor point at going-fraction fa (along wall) and depth-fraction fb.
-  const pt = (fa: number, fb: number): [number, number] =>
-    [Si[0] + ux * ACCESS_GOING * fa + dvx * fb, Si[1] + uz * ACCESS_GOING * fa + dvz * fb];
+  // Start a little along the wall from the corner so the tower clears it.
+  const startOff = Math.min(0.6, Math.max(0, auL - TW_GOING - 0.3));
+  const Sx = oPoly[0][0] + ux * startOff, Sz = oPoly[0][1] + uz * startOff;
+  // Tower point at going-fraction fa (along wall) and depth-fraction fb (outward).
+  const tp = (fa: number, fb: number): [number, number] =>
+    [Sx + ux * TW_GOING * fa + nx * TW_DEPTH * fb, Sz + uz * TW_GOING * fa + nz * TW_DEPTH * fb];
+
+  // Four tower standards + rosettes + base plates.
+  for (const fb of [0, 1]) for (const fa of [0, 1]) {
+    const [bx, bz] = tp(fa, fb);
+    tubes.push({ x: bx, y: stairH / 2, z: bz, length: stairH, rot: [0, 0, 0] });
+    for (const y of stairRYs) rosettes.push({ x: bx, y, z: bz });
+    if (!basePts.some(s => Math.hypot(s[0] - bx, s[1] - bz) < 0.05)) basePts.push([bx, bz]);
+  }
+  // Perimeter ledgers framing the tower at each lift.
+  for (let lvl = 1; lvl <= levels; lvl++) {
+    const y = Math.min(lvl * LIFT, stairH);
+    for (const fb of [0, 1]) {
+      const [a0x, a0z] = tp(0, fb), [a1x, a1z] = tp(1, fb);
+      tubes.push({ x: (a0x + a1x) / 2, y, z: (a0z + a1z) / 2, length: TW_GOING, rot: uRot });
+    }
+    for (const fa of [0, 1]) {
+      const [b0x, b0z] = tp(fa, 0), [b1x, b1z] = tp(fa, 1);
+      tubes.push({ x: (b0x + b1x) / 2, y, z: (b0z + b1z) / 2, length: TW_DEPTH, rot: nRot });
+    }
+  }
 
   if (accessType === 'ladder') {
-    // Vertical ladder in the corridor near the corner.
-    const [cx0, cz0] = pt(0.12, 0.5);
-    const LAD_HALF = 0.22;
+    // Vertical ladder on the tower's outer face.
+    const [cx0, cz0] = tp(0.5, 1);
+    const offx = nx * 0.06, offz = nz * 0.06;
+    const LAD_HALF = 0.225;
     for (const s of [-LAD_HALF, LAD_HALF]) {
-      tubes.push({ x: cx0 + ux * s, y: stairH / 2, z: cz0 + uz * s, length: stairH, rot: [0, 0, 0], r: RAIL_R });
+      tubes.push({ x: cx0 + ux * s + offx, y: stairH / 2, z: cz0 + uz * s + offz, length: stairH, rot: [0, 0, 0], r: RAIL_R });
     }
     for (let ry = 0.3; ry <= stairH - 0.1; ry += 0.3) {
-      tubes.push({ x: cx0, y: ry, z: cz0, length: LAD_HALF * 2, rot: uRot, r: 0.012 });
+      tubes.push({ x: cx0 + offx, y: ry, z: cz0 + offz, length: LAD_HALF * 2, rot: uRot, r: 0.012 });
     }
+    tubes.push({ x: cx0, y: stairH + RAIL_HI, z: cz0, length: TW_GOING, rot: uRot, r: RAIL_R });
   } else {
-    // Zig-zag stair filling the access bay: each flight spans the full going and
-    // rises one lift, alternating direction with a landing at each level.
+    // Zig-zag stair inside the tower: each flight spans the 2.4 m going and rises
+    // one lift, alternating direction with a landing at each level.
     const nTreads = 7;
     for (let li = 0; li < levels; li++) {
       const yBot = li * LIFT, yTop = Math.min((li + 1) * LIFT, stairH);
       const segH = yTop - yBot;
       const aS = li % 2 === 0 ? 0 : 1, aE = li % 2 === 0 ? 1 : 0;  // alternate direction
-      // Stringers on the inner (fb=0) and outer (fb=1) edges.
-      for (const fb of [0, 1]) {
-        const [p0x, p0z] = pt(aS, fb), [p1x, p1z] = pt(aE, fb);
+      for (const fb of [0, 1]) {   // stringers on both sides
+        const [p0x, p0z] = tp(aS, fb), [p1x, p1z] = tp(aE, fb);
         tubes.push({ x: (p0x + p1x) / 2, y: (yBot + yTop) / 2, z: (p0z + p1z) / 2,
-          length: Math.hypot(ACCESS_GOING, segH), rot: dirRot(p1x - p0x, segH, p1z - p0z), r: BRACE_R });
+          length: Math.hypot(TW_GOING, segH), rot: dirRot(p1x - p0x, segH, p1z - p0z), r: BRACE_R });
       }
-      // Treads spanning the corridor depth, climbing the flight.
-      for (let t = 0; t < nTreads; t++) {
+      for (let t = 0; t < nTreads; t++) {   // treads span the tower depth
         const f = (t + 0.5) / nTreads;
         const a = aS + (aE - aS) * f;
-        const [tx, tz] = pt(a, 0.5);
+        const [tx, tz] = tp(a, 0.5);
         boards.push({ cx: tx, cy: yBot + segH * f + 0.022, cz: tz,
-          length: depthLen * 0.92, depth: (ACCESS_GOING / nTreads) * 0.9, rotY: dAngle });
+          length: TW_DEPTH * 0.92, depth: (TW_GOING / nTreads) * 0.9, rotY: nAngle });
       }
-      // Landing platform at the top of the flight.
-      const [lx, lz] = pt(aE, 0.5);
-      boards.push({ cx: lx, cy: yTop + 0.022, cz: lz, length: depthLen * 0.92, depth: 0.45, rotY: dAngle });
-      // Outer handrail following the incline.
-      const [h0x, h0z] = pt(aS, 1), [h1x, h1z] = pt(aE, 1);
+      const [lx, lz] = tp(aE, 0.5);   // landing at top of flight
+      boards.push({ cx: lx, cy: yTop + 0.022, cz: lz, length: TW_DEPTH * 0.92, depth: 0.45, rotY: nAngle });
+      const [h0x, h0z] = tp(aS, 1), [h1x, h1z] = tp(aE, 1);   // outer handrail
       tubes.push({ x: (h0x + h1x) / 2, y: (yBot + yTop) / 2 + RAIL_HI, z: (h0z + h1z) / 2,
-        length: Math.hypot(ACCESS_GOING, segH), rot: dirRot(h1x - h0x, segH, h1z - h0z), r: RAIL_R });
+        length: Math.hypot(TW_GOING, segH), rot: dirRot(h1x - h0x, segH, h1z - h0z), r: RAIL_R });
     }
   }
 
