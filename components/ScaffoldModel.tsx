@@ -472,8 +472,10 @@ function buildScaffold(data: BuildingData) {
   const accessType = data.access_type ?? 'stair';
   const maxEave = Math.max(...Array.from({ length: nEdges }, (_, i) => faceH(data, i)));
   const stairH  = Math.max(LIFT, maxEave - 1.0);
-  const levels  = Math.max(1, Math.ceil(stairH / LIFT));
-  const TW_GOING = 2.4, TW_DEPTH = 1.2;   // along the wall × projecting out
+  // Each stair flight rises 1.5 m over a 2.4 m going (standard Kwikstage stair
+  // unit); flights zig-zag until they reach the top deck height.
+  const TW_GOING = 2.4, TW_DEPTH = 1.2, TW_RISE = 1.5;
+  const flights = Math.max(1, Math.ceil(stairH / TW_RISE));
   const stairRYs = Array.from({ length: Math.ceil(stairH / 0.5) }, (_, i) => (i + 1) * 0.5)
                     .filter(y => y <= stairH + 0.01);
 
@@ -499,9 +501,9 @@ function buildScaffold(data: BuildingData) {
     for (const y of stairRYs) rosettes.push({ x: bx, y, z: bz });
     if (!basePts.some(s => Math.hypot(s[0] - bx, s[1] - bz) < 0.05)) basePts.push([bx, bz]);
   }
-  // Perimeter ledgers framing the tower at each lift.
-  for (let lvl = 1; lvl <= levels; lvl++) {
-    const y = Math.min(lvl * LIFT, stairH);
+  // Perimeter ledgers framing the tower at each stair landing level.
+  for (let lvl = 1; lvl <= flights; lvl++) {
+    const y = Math.min(lvl * TW_RISE, stairH);
     for (const fb of [0, 1]) {
       const [a0x, a0z] = tp(0, fb), [a1x, a1z] = tp(1, fb);
       tubes.push({ x: (a0x + a1x) / 2, y, z: (a0z + a1z) / 2, length: TW_GOING, rot: uRot });
@@ -528,8 +530,8 @@ function buildScaffold(data: BuildingData) {
     // Zig-zag stair inside the tower: each flight spans the 2.4 m going and rises
     // one lift, alternating direction with a landing at each level.
     const nTreads = 7;
-    for (let li = 0; li < levels; li++) {
-      const yBot = li * LIFT, yTop = Math.min((li + 1) * LIFT, stairH);
+    for (let li = 0; li < flights; li++) {
+      const yBot = li * TW_RISE, yTop = Math.min((li + 1) * TW_RISE, stairH);
       const segH = yTop - yBot;
       const aS = li % 2 === 0 ? 0 : 1, aE = li % 2 === 0 ? 1 : 0;  // alternate direction
       for (const fb of [0, 1]) {   // stringers on both sides
