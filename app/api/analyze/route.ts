@@ -77,7 +77,17 @@ STEP 1 — Identify the THICK outer perimeter walls (exterior walls are heavier/
 STEP 2 — Add up ALL sub-span dimensions along the bottom edge to get total width. Do the same for top, left, right edges.
 STEP 3 — Trace only the thick exterior wall polygon (all 90° corners). If top-total ≠ bottom-total, trace the step. If left-total ≠ right-total, trace that step too.
 STEP 4 — Sanity check: footprint area must be > 80 m². If not, you traced interior walls — start over with the thick outer boundary.
-STEP 5 — Face heights: read each elevation drawing for ground-to-gutter. If no elevations, use defaults (wall_height_m=2.7, roof_type="gable").`;
+STEP 5 — Face heights: read each elevation drawing for ground-to-gutter. If no elevations, use defaults (wall_height_m=2.7, roof_type="gable").
+
+PRECISION — the polygon must match the plan, not approximate it:
+• Build coordinates on a real metre grid. Pick the bottom-left exterior corner as the origin, then WALK the perimeter corner-by-corner: each edge advances by the EXACT summed dimension for that wall, turning 90° at each corner. Every vertex must land precisely on a real wall corner.
+• The RATIO between edges in your output must equal the ratio of the read dimensions (a 12 m wall must be exactly twice the length of a 6 m wall in your coordinates). Do not eyeball pixel positions — derive every coordinate from the measured millimetres.
+• Re-trace every step/jog/setback in the exterior wall with its own vertices. Match the number of corners to the actual outline — do not round a stepped shape down to a rectangle.
+• Before finalising: confirm the walk returns exactly to the origin (the loop closes) and that opposite-side dimension totals agree with any step you traced.`;
+
+// Opus 4.8 + adaptive thinking on a plan can take a while — give the function
+// room so it isn't killed mid-analysis.
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
@@ -109,8 +119,12 @@ export async function POST(request: NextRequest) {
     }
 
     const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 2048,
+      model: 'claude-opus-4-8',
+      max_tokens: 8000,
+      // Adaptive thinking lets the model reason through the dimension chains
+      // before committing to coordinates — meaningfully more accurate tracing.
+      thinking: { type: 'adaptive' },
+      output_config: { effort: 'medium' },
       system: SYSTEM_PROMPT,
       messages: [userMessage],
     });

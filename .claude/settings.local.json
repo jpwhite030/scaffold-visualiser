@@ -32,7 +32,9 @@
       "Bash(curl -s -w '\\\\n---HTTP %{http_code}---\\\\n' --cookie sv_session=__TRACKED_VAR__ -F 'file=@./real.png;type=image/png' https://scaffold-visualiser.vercel.app/api/analyze)",
       "Bash(rm -f ./real.png)",
       "Bash(git commit -q --allow-empty -m 'Trigger redeploy: ANTHROPIC_API_KEY now set in Vercel *)",
-      "Bash(git commit -q -m 'Scaffold: flow seamlessly around internal corners *)"
+      "Bash(git commit -q -m 'Scaffold: flow seamlessly around internal corners *)",
+      "Bash(node -e \"console.log\\('sdk', require\\('@anthropic-ai/sdk/package.json'\\).version\\)\")",
+      "Bash(git commit -q -m 'Improve plan-tracing accuracy: upgrade to Opus 4.8 + adaptive thinking *)"
     ]
   }
 }
