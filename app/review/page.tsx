@@ -11,6 +11,9 @@ export default function ReviewPage() {
   const [loaded, setLoaded] = useState(false);
   const [worldW, setWorldW] = useState(16);
   const [worldD, setWorldD] = useState(11);
+  // The AI's original outline, captured on load so we can log (original ->
+  // corrected) as training data when the user generates.
+  const originalFootprintRef = useRef<[number, number][] | null>(null);
 
   useEffect(() => {
     const raw = sessionStorage.getItem('buildingData');
@@ -21,6 +24,7 @@ export default function ReviewPage() {
         const hd = (parsed.overall_depth_m ?? 11) / 2;
         parsed.footprint = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]];
       }
+      originalFootprintRef.current = parsed.footprint.map((p: [number, number]) => [...p] as [number, number]);
       setData(parsed);
       const b = footprintBounds(parsed.footprint);
       setWorldW(Math.max(1, Math.round((b.maxX - b.minX) * 10) / 10));
@@ -96,6 +100,19 @@ export default function ReviewPage() {
   };
 
   const handleGenerate = () => {
+    // Fire-and-forget: log the AI's original outline vs the user's corrected one
+    // as training data. Never block or fail the generate flow on this.
+    try {
+      const original = originalFootprintRef.current;
+      const corrected = data.footprint;
+      const wasEdited = !original || JSON.stringify(original) !== JSON.stringify(corrected);
+      fetch('/api/log-correction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageDataUrl, original, corrected, worldW, worldD, wasEdited }),
+      }).catch(() => {});
+    } catch { /* ignore */ }
+
     sessionStorage.setItem('buildingData', JSON.stringify(data));
     router.push('/viewer');
   };
