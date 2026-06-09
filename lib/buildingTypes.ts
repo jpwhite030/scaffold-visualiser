@@ -28,6 +28,9 @@ export interface BuildingData {
   // Which faces are gable ends — scaffold steps up 500 mm toward the ridge.
   // Same indexing as face_eave_heights. False/absent = eave side (uniform height).
   gable_faces?: boolean[];
+
+  // Access method for the scaffold tower at corner 0. Default 'stair'.
+  access_type?: 'stair' | 'ladder';
 }
 
 export const DEFAULT_BUILDING: BuildingData = {
@@ -42,6 +45,7 @@ export const DEFAULT_BUILDING: BuildingData = {
   roof_type: 'gable',
   roof_pitch_degrees: 22,
   eave_height_m: 2.7,
+  access_type: 'stair',
   footprint: [[-8, -5.5], [8, -5.5], [8, 5.5], [-8, 5.5]],
 };
 

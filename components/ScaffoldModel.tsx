@@ -14,12 +14,16 @@ const LIFT   = 2.0;
 const TUBE_R  = 0.024;
 const RAIL_R  = 0.018;
 const BRACE_R = 0.019;
-const TOE_R   = 0.025;
 const SEG     = 10;
 
 const RAIL_LO = 0.5;
 const RAIL_HI = 1.0;
 const STAIR_W = 0.9;
+
+// Kickboards (toe boards) — required where a person could fall > 2 m.
+const KB_H        = 0.15;   // 150 mm standard toe-board height
+const KB_T        = 0.025;  // board thickness
+const TOEBOARD_MIN_Y = 2.0; // only add kickboards to decks above this height
 
 // ── Colours — muted Kwikstage palette ────────────────────────────────────────
 const KS_TUBE    = '#607898';   // muted steel-blue — the Kwikstage body colour
@@ -142,6 +146,13 @@ interface Board {
   rotY: number;
 }
 
+// A vertical toe board standing on the edge of a deck.
+interface KickBoard {
+  cx: number; cy: number; cz: number;
+  length: number;
+  rotY: number;
+}
+
 // Kwikstage rosette star — position only; rendered as a component
 interface RosettePos { x: number; y: number; z: number }
 
@@ -250,6 +261,7 @@ function buildScaffold(data: BuildingData) {
   const BASE_Y = 0.5;
   const tubes: Tube[]           = [];
   const boards: Board[]         = [];
+  const kickboards: KickBoard[] = [];
   const rosettes: RosettePos[]  = [];
   const basePts: [number, number][] = [];
 
@@ -431,7 +443,11 @@ function buildScaffold(data: BuildingData) {
             rotY: angle,
           });
         }
-        tubes.push({ x: ocx, y: y + 0.075, z: ocz, length: bLen, rot, r: TOE_R });
+        // Kickboards (toe boards) on the open edges — required above 2 m.
+        if (y > TOEBOARD_MIN_Y) {
+          kickboards.push({ cx: ocx, cy: y + 0.04 + KB_H / 2, cz: ocz, length: bLen, rotY: angle });
+          kickboards.push({ cx: icx, cy: y + 0.04 + KB_H / 2, cz: icz, length: bLen, rotY: angle });
+        }
         tubes.push({ x: ocx, y: y + RAIL_LO, z: ocz, length: bLen, rot, r: RAIL_R });
         tubes.push({ x: ocx, y: y + RAIL_HI, z: ocz, length: bLen, rot, r: RAIL_R });
       }
@@ -478,21 +494,58 @@ function buildScaffold(data: BuildingData) {
     rosettes.push({ x: stX + e1ux * STAIR_W, y, z: stZ + e1uz * STAIR_W });
   }
 
-  for (let li = 0; li < stairBraceLevels; li++) {
-    const yBot = li * LIFT, yTop = Math.min((li + 1) * LIFT, stairH);
-    const segH = yTop - yBot;
-    tubes.push({ x: stX, y: (yBot + yTop) / 2, z: stZ, length: Math.hypot(STAIR_W, segH), rot: dirRot(e1ux * STAIR_W, segH, e1uz * STAIR_W) });
-    boards.push({ cx: stX + e1ux * STAIR_W / 2, cy: yTop + 0.022, cz: stZ + e1uz * STAIR_W / 2, length: STAIR_W, depth: 0.5, rotY: hAngle(e1ux, e1uz) });
-    tubes.push({ x: stX + e1ux * STAIR_W / 2, y: yTop + RAIL_HI, z: stZ + e1uz * STAIR_W / 2, length: STAIR_W, rot: stRot, r: RAIL_R });
+  // Base plates under the two access standards.
+  for (const [bx, bz] of [[stX, stZ], [stX + e1ux * STAIR_W, stZ + e1uz * STAIR_W]] as [number, number][]) {
+    if (!basePts.some(s => Math.hypot(s[0] - bx, s[1] - bz) < 0.05)) basePts.push([bx, bz]);
   }
 
-  return { tubes, boards, rosettes, basePts };
+  const oX = avgOutX / aNorm, oZ = avgOutZ / aNorm;   // outward unit (away from building)
+  const accessType = data.access_type ?? 'stair';
+
+  if (accessType === 'ladder') {
+    // Vertical ladder on the outer face of the access bay: two stiles + rungs.
+    const cmx = stX + e1ux * STAIR_W / 2, cmz = stZ + e1uz * STAIR_W / 2;
+    const offX = oX * 0.06, offZ = oZ * 0.06;
+    const LAD_HALF = 0.225;
+    for (const s of [-LAD_HALF, LAD_HALF]) {
+      tubes.push({ x: cmx + e1ux * s + offX, y: stairH / 2, z: cmz + e1uz * s + offZ, length: stairH, rot: [0, 0, 0], r: RAIL_R });
+    }
+    const ladRot = hRot(e1ux, e1uz);
+    for (let ry = 0.3; ry <= stairH - 0.1; ry += 0.3) {
+      tubes.push({ x: cmx + offX, y: ry, z: cmz + offZ, length: LAD_HALF * 2, rot: ladRot, r: 0.012 });
+    }
+    // Guardrail across the top landing.
+    tubes.push({ x: cmx, y: stairH + RAIL_HI, z: cmz, length: STAIR_W, rot: stRot, r: RAIL_R });
+  } else {
+    // Stair flights: inclined stringer + stepped treads + inclined handrail per lift.
+    const crossRot = hAngle(oX, oZ);
+    const STEP_W = 0.6, STEP_GO = 0.22, nSteps = 5;
+    for (let li = 0; li < stairBraceLevels; li++) {
+      const yBot = li * LIFT, yTop = Math.min((li + 1) * LIFT, stairH);
+      const segH = yTop - yBot;
+      tubes.push({ x: stX, y: (yBot + yTop) / 2, z: stZ, length: Math.hypot(STAIR_W, segH), rot: dirRot(e1ux * STAIR_W, segH, e1uz * STAIR_W), r: BRACE_R });
+      for (let s = 0; s < nSteps; s++) {
+        const f = (s + 0.5) / nSteps;
+        boards.push({
+          cx: stX + e1ux * STAIR_W * f + oX * 0.05,
+          cy: yBot + segH * f + 0.022,
+          cz: stZ + e1uz * STAIR_W * f + oZ * 0.05,
+          length: STEP_W, depth: STEP_GO, rotY: crossRot,
+        });
+      }
+      tubes.push({ x: stX, y: (yBot + yTop) / 2 + RAIL_HI, z: stZ, length: Math.hypot(STAIR_W, segH), rot: dirRot(e1ux * STAIR_W, segH, e1uz * STAIR_W), r: RAIL_R });
+    }
+    // Top landing onto the working deck.
+    boards.push({ cx: stX + e1ux * STAIR_W / 2, cy: stairH + 0.022, cz: stZ + e1uz * STAIR_W / 2, length: STAIR_W, depth: 0.6, rotY: hAngle(e1ux, e1uz) });
+  }
+
+  return { tubes, boards, kickboards, rosettes, basePts };
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function ScaffoldModel({ data }: { data: BuildingData }) {
-  const { tubes, boards, rosettes, basePts } = useMemo(() => buildScaffold(data), [data]);
+  const { tubes, boards, kickboards, rosettes, basePts } = useMemo(() => buildScaffold(data), [data]);
 
   return (
     <group>
@@ -507,6 +560,14 @@ export default function ScaffoldModel({ data }: { data: BuildingData }) {
         <mesh key={`b${i}`} position={[b.cx, b.cy, b.cz]} rotation={[0, b.rotY, 0]} castShadow>
           <boxGeometry args={[b.length, 0.038, b.depth]} />
           <meshStandardMaterial color={KS_BOARD} metalness={0.45} roughness={0.5} />
+        </mesh>
+      ))}
+
+      {/* Kickboards / toe boards — vertical boards on deck edges above 2 m */}
+      {kickboards.map((k, i) => (
+        <mesh key={`k${i}`} position={[k.cx, k.cy, k.cz]} rotation={[0, k.rotY, 0]} castShadow>
+          <boxGeometry args={[k.length, KB_H, KB_T]} />
+          <meshStandardMaterial color="#caa24a" metalness={0.2} roughness={0.7} />
         </mesh>
       ))}
 

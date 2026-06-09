@@ -37,9 +37,10 @@ export default function ReviewPage() {
 
   const set = (field: keyof BuildingData, value: string) => {
     setData(prev => {
+      const isStringField = field === 'roof_type' || field === 'access_type';
       const updated: BuildingData = {
         ...prev,
-        [field]: field === 'roof_type' ? value : Number(value),
+        [field]: isStringField ? value : Number(value),
       };
       // When changing num_stories, scale eave_height_m so the 3D model and scaffold update immediately
       if (field === 'num_stories') {
@@ -248,6 +249,16 @@ export default function ReviewPage() {
                   onChange={v => set('roof_pitch_degrees', v)} min={5} max={60} step={1} />
               )}
             </div>
+          </section>
+
+          <section>
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Access</h2>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Access Type</label>
+            <select value={data.access_type ?? 'stair'} onChange={e => set('access_type', e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-orange-400 focus:border-transparent outline-none">
+              <option value="stair">Stair access</option>
+              <option value="ladder">Ladder access</option>
+            </select>
           </section>
         </div>
 
