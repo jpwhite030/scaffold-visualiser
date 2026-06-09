@@ -80,10 +80,12 @@ STEP 4 — Sanity check: footprint area must be > 80 m². If not, you traced int
 STEP 5 — Face heights: read each elevation drawing for ground-to-gutter. If no elevations, use defaults (wall_height_m=2.7, roof_type="gable").
 
 PRECISION — the polygon must match the plan, not approximate it:
+• Trace the OUTERMOST face of the thick exterior walls — the line where the building meets the outside. Your vertices sit ON that outer wall face, NOT on the wall centreline and NOT on the inner (room-side) face. A common mistake is tracing slightly inside the building; push every point out to the outer edge of the thick wall.
+• Capture the FULL extent. The leftmost, rightmost, topmost and bottommost vertices must each sit on the outermost wall on that side — do not stop short of a wing or room. Sweep the entire drawing: the building often extends further right/left than the central rooms (e.g. a Study, Rumpus, Garage or covered Balcony on one end is still part of the footprint). Include covered/roofed balconies and alfrescos that sit under the main roof or have support posts.
 • Build coordinates on a real metre grid. Pick the bottom-left exterior corner as the origin, then WALK the perimeter corner-by-corner: each edge advances by the EXACT summed dimension for that wall, turning 90° at each corner. Every vertex must land precisely on a real wall corner.
 • The RATIO between edges in your output must equal the ratio of the read dimensions (a 12 m wall must be exactly twice the length of a 6 m wall in your coordinates). Do not eyeball pixel positions — derive every coordinate from the measured millimetres.
 • Re-trace every step/jog/setback in the exterior wall with its own vertices. Match the number of corners to the actual outline — do not round a stepped shape down to a rectangle.
-• Before finalising: confirm the walk returns exactly to the origin (the loop closes) and that opposite-side dimension totals agree with any step you traced.`;
+• Before finalising: confirm the walk returns exactly to the origin (the loop closes), that opposite-side dimension totals agree with any step you traced, and that no part of the outer wall lies outside your polygon.`;
 
 // Opus 4.8 + adaptive thinking on a plan can take a while — give the function
 // room so it isn't killed mid-analysis.
@@ -124,7 +126,7 @@ export async function POST(request: NextRequest) {
       // Adaptive thinking lets the model reason through the dimension chains
       // before committing to coordinates — meaningfully more accurate tracing.
       thinking: { type: 'adaptive' },
-      output_config: { effort: 'medium' },
+      output_config: { effort: 'high' },
       system: SYSTEM_PROMPT,
       messages: [userMessage],
     });

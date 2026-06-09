@@ -34,7 +34,8 @@
       "Bash(git commit -q --allow-empty -m 'Trigger redeploy: ANTHROPIC_API_KEY now set in Vercel *)",
       "Bash(git commit -q -m 'Scaffold: flow seamlessly around internal corners *)",
       "Bash(node -e \"console.log\\('sdk', require\\('@anthropic-ai/sdk/package.json'\\).version\\)\")",
-      "Bash(git commit -q -m 'Improve plan-tracing accuracy: upgrade to Opus 4.8 + adaptive thinking *)"
+      "Bash(git commit -q -m 'Improve plan-tracing accuracy: upgrade to Opus 4.8 + adaptive thinking *)",
+      "Bash(git commit -q -m 'Tracing accuracy: outer-face + full-extent guidance, effort high *)"
     ]
   }
 }
