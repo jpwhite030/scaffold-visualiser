@@ -462,7 +462,8 @@ function buildScaffold(data: BuildingData) {
         tubes.push({ x: ocx, y: y + RAIL_HI, z: ocz, length: bLen, rot, r: RAIL_R });
       }
 
-      const numBraceLevels = Math.max(1, Math.ceil(bayTopY / LIFT));
+      // No face braces in the access bay — they'd cut straight through the stairs.
+      const numBraceLevels = inAccess ? 0 : Math.max(1, Math.ceil(bayTopY / LIFT));
       for (let li = 0; li < numBraceLevels; li++) {
         const yBot = li * LIFT;
         const yTop = Math.min((li + 1) * LIFT, bayTopY);
