@@ -20,7 +20,19 @@
       "Bash(npm run *)",
       "Bash(node -e \"process.env.AUTH_SECRET='Bzl+gNGdkUSA2AqakpGwwnAWNNuBTZuBDSjkhtqOER8=';const c=require\\('node:crypto'\\);const s=process.env.AUTH_SECRET;const enc=Buffer.from\\('admin.'+\\(Date.now\\(\\)+86400000\\)\\).toString\\('base64url'\\);const sig=c.createHmac\\('sha256',s\\).update\\(enc\\).digest\\('base64url'\\);console.log\\(enc+'.'+sig\\)\")",
       "Bash(curl -s -o /dev/null -w 'status=%{http_code}\\\\n' --cookie sv_session=__TRACKED_VAR__ http://localhost:3000/)",
-      "Bash(curl -s -o /dev/null -w \"status=%{http_code} location=%{redirect_url}\\\\n\" --cookie \"sv_session=tampered.value\" http://localhost:3000/)"
+      "Bash(curl -s -o /dev/null -w \"status=%{http_code} location=%{redirect_url}\\\\n\" --cookie \"sv_session=tampered.value\" http://localhost:3000/)",
+      "Bash(git commit -q -m 'Add username/password login gate *)",
+      "Bash(curl -s -o /dev/null -w \"status=%{http_code} location=%{redirect_url}\\\\n\" https://scaffold-visualiser.vercel.app/)",
+      "Bash(curl -s -o /dev/null -w \"status=%{http_code} location=%{redirect_url}\\\\n\" -X POST https://scaffold-visualiser.vercel.app/api/analyze)",
+      "Bash(node -e ' *)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -w '\\\\n---HTTP %{http_code}---\\\\n' --cookie sv_session=__TRACKED_VAR__ -F 'file=@/tmp/t.png;type=image/png' https://scaffold-visualiser.vercel.app/api/analyze)",
+      "Bash(grep -A 20 \"Analyze error\" /tmp/sv2.log 2>&1 | head -40)",
+      "Bash(node -e \"const c=require\\('node:crypto'\\);const s='Bzl+gNGdkUSA2AqakpGwwnAWNNuBTZuBDSjkhtqOER8=';const enc=Buffer.from\\('admin.'+\\(Date.now\\(\\)+86400000\\)\\).toString\\('base64url'\\);process.stdout.write\\(enc+'.'+c.createHmac\\('sha256',s\\).update\\(enc\\).digest\\('base64url'\\)\\)\")",
+      "Bash(curl -s -w '\\\\n---HTTP %{http_code}---\\\\n' --cookie sv_session=__TRACKED_VAR__ -F 'file=@./real.png;type=image/png' https://scaffold-visualiser.vercel.app/api/analyze)",
+      "Bash(rm -f ./real.png)",
+      "Bash(git commit -q --allow-empty -m 'Trigger redeploy: ANTHROPIC_API_KEY now set in Vercel *)",
+      "Bash(git commit -q -m 'Scaffold: flow seamlessly around internal corners *)"
     ]
   }
 }

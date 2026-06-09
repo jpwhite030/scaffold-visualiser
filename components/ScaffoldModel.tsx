@@ -187,31 +187,16 @@ function faceH(data: BuildingData, ei: number): number {
     : data.eave_height_m;
 }
 
-// Returns the outward-facing unit normal of an edge (right-hand side for CCW polygon).
-function edgeOutwardNormal(p1: [number, number], p2: [number, number]): [number, number] {
-  const dx = p2[0] - p1[0], dz = p2[1] - p1[1];
-  const len = Math.hypot(dx, dz);
-  return [dz / len, -dx / len];
-}
-
-// True when polygon vertex vi is a reflex (concave) corner for a CCW polygon.
-// The offset miter at a reflex corner points INTO the notch — those corners must
-// be clipped to the wall edge instead.
-function isReflexCorner(poly: [number, number][], vi: number): boolean {
-  const n = poly.length;
-  const a = poly[(vi - 1 + n) % n], b = poly[vi], c = poly[(vi + 1) % n];
-  return (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]) < 0;
-}
-
 function buildScaffold(data: BuildingData) {
   const poly = ensureCCW(data.footprint);
   const nEdges = poly.length;
 
+  // Mitred offset lines for the inner (0.2 m) and outer (1.4 m) standards.
+  // The miter is computed for every corner — convex AND internal/re-entrant —
+  // so adjacent faces share each corner point and the scaffold flows
+  // continuously around it (see the corner handling in the edge loop below).
   const iPoly = offsetPolygon(poly, INNER);
   const oPoly = offsetPolygon(poly, OUTER);
-
-  // Pre-compute which vertices are reflex (concave inner corners like an L-shape notch).
-  const reflex = Array.from({ length: nEdges }, (_, i) => isReflexCorner(poly, i));
 
   const BASE_Y = 0.5;
   const tubes: Tube[]           = [];
@@ -222,21 +207,14 @@ function buildScaffold(data: BuildingData) {
   for (let ei = 0; ei < nEdges; ei++) {
     const ei1 = (ei + 1) % nEdges;
 
-    // For reflex corners the miter offset extends into the building notch — use a
-    // plain edge-perpendicular offset instead so the scaffold is clipped at the wall.
-    const eNorm = edgeOutwardNormal(poly[ei], poly[ei1]);
-    const op1 = reflex[ei]
-      ? [poly[ei][0] + eNorm[0] * OUTER, poly[ei][1] + eNorm[1] * OUTER] as [number, number]
-      : oPoly[ei];
-    const ip1 = reflex[ei]
-      ? [poly[ei][0] + eNorm[0] * INNER, poly[ei][1] + eNorm[1] * INNER] as [number, number]
-      : iPoly[ei];
-    const op2 = reflex[ei1]
-      ? [poly[ei1][0] + eNorm[0] * OUTER, poly[ei1][1] + eNorm[1] * OUTER] as [number, number]
-      : oPoly[ei1];
-    const ip2 = reflex[ei1]
-      ? [poly[ei1][0] + eNorm[0] * INNER, poly[ei1][1] + eNorm[1] * INNER] as [number, number]
-      : iPoly[ei1];
+    // Every corner uses the shared mitred offset point — convex and internal
+    // (re-entrant) corners alike. Because the two faces meeting at a corner read
+    // the same oPoly/iPoly vertex, their standards, ledgers and platforms join up
+    // seamlessly around internal corners instead of ending in disconnected stubs.
+    const op1 = oPoly[ei];
+    const ip1 = iPoly[ei];
+    const op2 = oPoly[ei1];
+    const ip2 = iPoly[ei1];
 
     const dx = op2[0] - op1[0], dz = op2[1] - op1[1];
     const len = Math.hypot(dx, dz);
@@ -264,12 +242,13 @@ function buildScaffold(data: BuildingData) {
     const rosetteYs = Array.from({ length: Math.ceil(totalH / 0.5) }, (_, i) => (i + 1) * 0.5)
                        .filter(y => y <= totalH + 0.01);
 
-    // Corner-standard heights: for convex corners, match the taller adjacent face.
-    // For reflex corners each face has its own independent clipped standard.
+    // Corner-standard heights: a shared corner standard must reach the taller of
+    // its two adjacent faces (applies to every corner now that internal corners
+    // share a standard too).
     const prevEave = faceH(data, (ei - 1 + nEdges) % nEdges);
     const nextEave = faceH(data, ei1);
-    const tH0 = reflex[ei]  ? topDeckY : Math.max(LIFT, Math.max(eave, prevEave) - 1.0);
-    const tH1 = reflex[ei1] ? topDeckY : Math.max(LIFT, Math.max(eave, nextEave) - 1.0);
+    const tH0 = Math.max(LIFT, Math.max(eave, prevEave) - 1.0);
+    const tH1 = Math.max(LIFT, Math.max(eave, nextEave) - 1.0);
 
     const oPts = standardBayPoints(op1, op2);
     const numBays = oPts.length - 1;
