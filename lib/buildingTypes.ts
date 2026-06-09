@@ -31,6 +31,10 @@ export interface BuildingData {
 
   // Access method for the scaffold tower at corner 0. Default 'stair'.
   access_type?: 'stair' | 'ladder';
+
+  // Top-deck protection. 'roof_catch' = 1 m below roof + 4 rails (default);
+  // 'edge_protection' = 2 m below roof + 2 rails.
+  protection_type?: 'roof_catch' | 'edge_protection';
 }
 
 export const DEFAULT_BUILDING: BuildingData = {
@@ -46,6 +50,7 @@ export const DEFAULT_BUILDING: BuildingData = {
   roof_pitch_degrees: 22,
   eave_height_m: 2.7,
   access_type: 'stair',
+  protection_type: 'roof_catch',
   footprint: [[-8, -5.5], [8, -5.5], [8, 5.5], [-8, 5.5]],
 };
 

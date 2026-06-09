@@ -264,6 +264,17 @@ function buildScaffold(data: BuildingData) {
   const rosettes: RosettePos[]  = [];
   const basePts: [number, number][] = [];
 
+  // Top-deck protection mode:
+  //  • roof_catch     — top deck 1 m below the roof, with 4 handrails (a tall
+  //                     catch barrier reaching above the roof line). Default.
+  //  • edge_protection — top deck 2 m below the roof, with 2 handrails.
+  const protectionType = data.protection_type ?? 'roof_catch';
+  const topOffset = protectionType === 'edge_protection' ? 2.0 : 1.0;
+  const topRailYs = protectionType === 'roof_catch'
+    ? [0.5, 1.0, 1.5, 2.0]      // 4 rails
+    : [RAIL_LO, RAIL_HI];       // 2 rails
+  const postExt = protectionType === 'roof_catch' ? 2.0 : RAIL_HI;  // guardrail post height above top deck
+
   for (let ei = 0; ei < nEdges; ei++) {
     const ei1 = (ei + 1) % nEdges;
 
@@ -283,9 +294,10 @@ function buildScaffold(data: BuildingData) {
     const rot   = hRot(ux, uz);
     const angle = hAngle(ux, uz);
 
-    // Per-face height — top deck always 1 m below eave (Set for Roof rule).
+    // Per-face height — top deck sits topOffset below the eave (1 m roof catch
+    // / 2 m edge protection).
     const eave      = faceH(data, ei);
-    const topDeckY  = Math.max(LIFT, eave - 1.0);
+    const topDeckY  = Math.max(LIFT, eave - topOffset);
     const totalH    = topDeckY;
     // Dummy ring: 1 m below top deck when eave > 3.5 m.
     const dummyLiftY = eave > 3.5 ? topDeckY - 1.0 : null;
@@ -307,8 +319,8 @@ function buildScaffold(data: BuildingData) {
     // share a standard too).
     const prevEave = faceH(data, (ei - 1 + nEdges) % nEdges);
     const nextEave = faceH(data, ei1);
-    const tH0 = Math.max(LIFT, Math.max(eave, prevEave) - 1.0);
-    const tH1 = Math.max(LIFT, Math.max(eave, nextEave) - 1.0);
+    const tH0 = Math.max(LIFT, Math.max(eave, prevEave) - topOffset);
+    const tH1 = Math.max(LIFT, Math.max(eave, nextEave) - topOffset);
 
     const oPts = standardBayPoints(op1, op2);
     const numBays = oPts.length - 1;
@@ -336,7 +348,7 @@ function buildScaffold(data: BuildingData) {
     // Geometry cap — absolute maximum top deck at a given distance from face centre
     const gableGeoCap = (dist: number): number => {
       const localH = eave + Math.max(0, halfLen - dist) * pitchTan;
-      return Math.max(topDeckY, Math.floor((localH - 1.0) / 0.5) * 0.5);
+      return Math.max(topDeckY, Math.floor((localH - topOffset) / 0.5) * 0.5);
     };
 
     // Per-bay top deck heights: exactly 500 mm per step from the corner, capped by geometry
@@ -373,7 +385,8 @@ function buildScaffold(data: BuildingData) {
                     .filter(y => y <= stdH + 0.01);
 
       tubes.push({ x: ox, y: stdH / 2, z: oz, length: stdH, rot: [0, 0, 0] });
-      tubes.push({ x: ox, y: stdH + RAIL_HI / 2, z: oz, length: RAIL_HI, rot: [0, 0, 0] });
+      // Guardrail post above the deck — taller for roof catch (carries 4 rails).
+      tubes.push({ x: ox, y: stdH + postExt / 2, z: oz, length: postExt, rot: [0, 0, 0] });
       for (const y of rYs) rosettes.push({ x: ox, y, z: oz });
       if (!basePts.some(s => Math.hypot(s[0] - ox, s[1] - oz) < 0.05)) basePts.push([ox, oz]);
 
@@ -445,8 +458,13 @@ function buildScaffold(data: BuildingData) {
         // Kickboard (toe board) on the OUTER edge of every deck — the open/fall
         // side. The inner edge sits against the building, so no toe board there.
         kickboards.push({ cx: ocx, cy: y + 0.04 + KB_H / 2, cz: ocz, length: bLen, rotY: angle });
-        tubes.push({ x: ocx, y: y + RAIL_LO, z: ocz, length: bLen, rot, r: RAIL_R });
-        tubes.push({ x: ocx, y: y + RAIL_HI, z: ocz, length: bLen, rot, r: RAIL_R });
+        // Guardrails — the top deck gets the protection-mode rail set (4 for roof
+        // catch, 2 for edge protection); lower decks get the standard 2 rails.
+        const isTopDeck = y >= bayTopY - 0.01;
+        const railSet = isTopDeck ? topRailYs : [RAIL_LO, RAIL_HI];
+        for (const ry of railSet) {
+          tubes.push({ x: ocx, y: y + ry, z: ocz, length: bLen, rot, r: RAIL_R });
+        }
       }
 
       const numBraceLevels = Math.max(1, Math.ceil(bayTopY / LIFT));
@@ -471,7 +489,7 @@ function buildScaffold(data: BuildingData) {
   // zig-zag stair (or a ladder) inside it.
   const accessType = data.access_type ?? 'stair';
   const maxEave = Math.max(...Array.from({ length: nEdges }, (_, i) => faceH(data, i)));
-  const stairH  = Math.max(LIFT, maxEave - 1.0);
+  const stairH  = Math.max(LIFT, maxEave - topOffset);   // reach the top deck
   // Each stair flight rises 1.5 m over a 2.4 m going (standard Kwikstage stair
   // unit); flights zig-zag until they reach the top deck height.
   const TW_GOING = 2.4, TW_DEPTH = 1.2, TW_RISE = 1.5;

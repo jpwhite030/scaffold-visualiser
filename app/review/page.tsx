@@ -37,7 +37,7 @@ export default function ReviewPage() {
 
   const set = (field: keyof BuildingData, value: string) => {
     setData(prev => {
-      const isStringField = field === 'roof_type' || field === 'access_type';
+      const isStringField = field === 'roof_type' || field === 'access_type' || field === 'protection_type';
       const updated: BuildingData = {
         ...prev,
         [field]: isStringField ? value : Number(value),
@@ -258,6 +258,18 @@ export default function ReviewPage() {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-orange-400 focus:border-transparent outline-none">
               <option value="stair">Stair access</option>
               <option value="ladder">Ladder access</option>
+            </select>
+          </section>
+
+          <section>
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">Top Protection</h2>
+            <p className="text-xs text-gray-400 mb-3">
+              Roof catch: top deck 1&nbsp;m below roof, 4 handrails. Edge protection: 2&nbsp;m below roof, 2 handrails.
+            </p>
+            <select value={data.protection_type ?? 'roof_catch'} onChange={e => set('protection_type', e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-orange-400 focus:border-transparent outline-none">
+              <option value="roof_catch">Roof catch (1 m down, 4 rails)</option>
+              <option value="edge_protection">Edge protection (2 m down, 2 rails)</option>
             </select>
           </section>
         </div>
