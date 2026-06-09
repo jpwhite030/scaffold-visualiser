@@ -187,8 +187,57 @@ function faceH(data: BuildingData, ei: number): number {
     : data.eave_height_m;
 }
 
+// Reflex (concave) corner test for a CCW polygon — the inside corner of a notch.
+function isReflex(poly: [number, number][], i: number): boolean {
+  const n = poly.length;
+  const a = poly[(i - 1 + n) % n], b = poly[i], c = poly[(i + 1) % n];
+  return (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]) < 0;
+}
+
+// Scaffold can't physically fit inside a notch narrower than ~2× the standoff,
+// or shallower than one standoff — the two runs would overlap (the tangled bay
+// you see at tight internal corners). Real scaffolders BRIDGE straight across
+// such a notch. This collapses any small concave pocket (1–2 interior vertices
+// between two nearby reflex corners) back to a straight edge across its mouth,
+// so the scaffold runs across it. The house model keeps the real notch.
+function bridgeNarrowNotches(input: [number, number][]): [number, number][] {
+  const MIN_WIDTH = 2 * OUTER + 0.2;   // ~3.0 m mouth needed to fit a run down each side
+  const MIN_DEPTH = OUTER + 0.2;       // ~1.6 m needed to fit a run across the back
+  let poly = input.map(p => [...p] as [number, number]);
+  for (let guard = 0; guard < 20; guard++) {
+    const n = poly.length;
+    if (n <= 4) break;
+    let collapsed = false;
+    for (let i = 0; i < n && !collapsed; i++) {
+      for (let gap = 2; gap <= 3 && !collapsed; gap++) {   // gap 2 → 1 interior vtx, 3 → 2
+        if (n - (gap - 1) < 4) continue;
+        const j = (i + gap) % n;
+        if (!isReflex(poly, i) || !isReflex(poly, j)) continue;
+        const [ix, iz] = poly[i], [jx, jz] = poly[j];
+        const width = Math.hypot(ix - jx, iz - jz);
+        const ex = jx - ix, ez = jz - iz, el = Math.hypot(ex, ez) || 1;
+        let depth = 0;
+        for (let s = 1; s < gap; s++) {
+          const [px, pz] = poly[(i + s) % n];
+          depth = Math.max(depth, Math.abs((px - ix) * ez - (pz - iz) * ex) / el);
+        }
+        if (width < MIN_WIDTH || depth < MIN_DEPTH) {
+          const remove = new Set<number>();
+          for (let s = 1; s < gap; s++) remove.add((i + s) % n);
+          poly = poly.filter((_, idx) => !remove.has(idx));
+          collapsed = true;
+        }
+      }
+    }
+    if (!collapsed) break;
+  }
+  return poly;
+}
+
 function buildScaffold(data: BuildingData) {
-  const poly = ensureCCW(data.footprint);
+  // Bridge across notches too small for scaffold to wrap (prevents overlapping
+  // runs at tight internal corners); wide notches still flow around normally.
+  const poly = bridgeNarrowNotches(ensureCCW(data.footprint));
   const nEdges = poly.length;
 
   // Mitred offset lines for the inner (0.2 m) and outer (1.4 m) standards.

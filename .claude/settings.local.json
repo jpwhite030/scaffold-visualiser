@@ -43,7 +43,8 @@
       "Bash(node -e \"console.log\\('installed @vercel/blob:', !!require.resolve\\('@vercel/blob'\\)\\)\")",
       "Bash(git commit -q -m 'Add footprint correction logging \\(training dataset capture\\) *)",
       "Bash(npx tsc *)",
-      "Bash(git commit -q -m 'Store corrections as private blobs \\(customer plan data\\) *)"
+      "Bash(git commit -q -m 'Store corrections as private blobs \\(customer plan data\\) *)",
+      "Bash(git commit -q -m 'Scaffold: bridge across notches too small to wrap *)"
     ]
   }
 }
