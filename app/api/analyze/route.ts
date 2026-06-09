@@ -125,8 +125,11 @@ export async function POST(request: NextRequest) {
       max_tokens: 8000,
       // Adaptive thinking lets the model reason through the dimension chains
       // before committing to coordinates — meaningfully more accurate tracing.
+      // Effort kept low so the call finishes well under Vercel's 60s function
+      // limit (effort 'high' was causing 504 timeouts on complex plans). Opus
+      // 4.8's high-res vision still does most of the accuracy work.
       thinking: { type: 'adaptive' },
-      output_config: { effort: 'high' },
+      output_config: { effort: 'low' },
       system: SYSTEM_PROMPT,
       messages: [userMessage],
     });
