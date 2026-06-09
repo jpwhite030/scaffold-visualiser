@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     const key = `corrections/${record.capturedAt.replace(/[:.]/g, '-')}-${Math.random().toString(36).slice(2, 8)}.json`;
 
     await put(key, JSON.stringify(record), {
-      access: 'public',
+      access: 'private',
       contentType: 'application/json',
       addRandomSuffix: false,
     });

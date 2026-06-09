@@ -41,7 +41,9 @@
       "Bash(git commit -q -m 'Make footprint drag robust: window pointer listeners *)",
       "Bash(npm install *)",
       "Bash(node -e \"console.log\\('installed @vercel/blob:', !!require.resolve\\('@vercel/blob'\\)\\)\")",
-      "Bash(git commit -q -m 'Add footprint correction logging \\(training dataset capture\\) *)"
+      "Bash(git commit -q -m 'Add footprint correction logging \\(training dataset capture\\) *)",
+      "Bash(npx tsc *)",
+      "Bash(git commit -q -m 'Store corrections as private blobs \\(customer plan data\\) *)"
     ]
   }
 }
