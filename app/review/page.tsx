@@ -294,12 +294,18 @@ function FootprintEditor({ footprint, imageDataUrl, worldWidth, worldDepth, onCh
     const svg = svgRef.current;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
-    const sx = ((e.clientX - rect.left) / rect.width) * VW;
-    const sy = ((e.clientY - rect.top)  / rect.height) * VHRef.current;
-    const wx = ((sx / VW             - PAD) / (1 - 2 * PAD) - 0.5) * safeWRef.current;
-    const wz = ((sy / VHRef.current  - PAD) / (1 - 2 * PAD) - 0.5) * safeDRef.current;
+    const VHc = VHRef.current;
+    // Clamp the dot to stay fully on-screen (R = dragging dot radius) so it can't
+    // be dragged past an edge, clipped by the container, and lost.
+    const R = 24;
+    const sx = Math.max(R, Math.min(VW  - R, ((e.clientX - rect.left) / rect.width)  * VW));
+    const sy = Math.max(R, Math.min(VHc - R, ((e.clientY - rect.top)  / rect.height) * VHc));
+    const wx = ((sx / VW   - PAD) / (1 - 2 * PAD) - 0.5) * safeWRef.current;
+    const wz = ((sy / VHc  - PAD) / (1 - 2 * PAD) - 0.5) * safeDRef.current;
+    // Only reject a near-exact overlap (would make a zero-length edge); the old
+    // 0.5 m guard blocked legitimate placements near other corners.
     const tooClose = footprintRef.current.some(
-      ([ox, oz], i) => i !== idx && Math.hypot(ox - wx, oz - wz) < 0.5
+      ([ox, oz], i) => i !== idx && Math.hypot(ox - wx, oz - wz) < 0.05
     );
     if (!tooClose) {
       onChangeRef.current(

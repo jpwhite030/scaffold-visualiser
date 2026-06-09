@@ -35,7 +35,8 @@
       "Bash(git commit -q -m 'Scaffold: flow seamlessly around internal corners *)",
       "Bash(node -e \"console.log\\('sdk', require\\('@anthropic-ai/sdk/package.json'\\).version\\)\")",
       "Bash(git commit -q -m 'Improve plan-tracing accuracy: upgrade to Opus 4.8 + adaptive thinking *)",
-      "Bash(git commit -q -m 'Tracing accuracy: outer-face + full-extent guidance, effort high *)"
+      "Bash(git commit -q -m 'Tracing accuracy: outer-face + full-extent guidance, effort high *)",
+      "Bash(git commit -q -m 'Fix footprint point drag: clamp on-screen + relax overlap guard *)"
     ]
   }
 }
