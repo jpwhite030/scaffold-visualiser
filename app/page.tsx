@@ -95,10 +95,8 @@ export default function UploadPage() {
       </form>
       <div className="w-full max-w-xl">
         <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Scaffold Visualiser</h1>
-          <p className="text-gray-500 text-base">
-            Upload building plans and generate a 3D model of the house and Kwikstage scaffold.
-          </p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="Scaffold Visualiser" className="mx-auto w-full max-w-md" />
         </div>
 
         <label

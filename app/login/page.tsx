@@ -9,7 +9,8 @@ export default function LoginPage() {
     <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Scaffold Visualiser</h1>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="Scaffold Visualiser" className="mx-auto w-full max-w-[240px] mb-4" />
           <p className="text-gray-500 text-sm">Sign in to continue</p>
         </div>
 

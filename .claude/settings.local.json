@@ -44,7 +44,14 @@
       "Bash(git commit -q -m 'Add footprint correction logging \\(training dataset capture\\) *)",
       "Bash(npx tsc *)",
       "Bash(git commit -q -m 'Store corrections as private blobs \\(customer plan data\\) *)",
-      "Bash(git commit -q -m 'Scaffold: bridge across notches too small to wrap *)"
+      "Bash(git commit -q -m 'Scaffold: bridge across notches too small to wrap *)",
+      "Read(//c/Users/jack/scaffold-visualiser/**)",
+      "Bash(grep -iE \"\\\\.\\(png|jpg|jpeg|ico|svg|webp\\)$\")",
+      "Bash(ls -lt ~/Downloads 2>/dev/null | grep -iE \"\\\\.\\(png|jpg|jpeg|ico|svg|webp\\)\" | head -8 ; echo \"=== Desktop ===\" ; ls -lt ~/Desktop 2>/dev/null | grep -iE \"\\\\.\\(png|jpg|jpeg|ico|svg|webp\\)\" | head -8 ; echo \"=== project root loose images ===\" ; ls -lt \"c:\\\\Users\\\\jack\\\\scaffold-visualiser\" 2>/dev/null | grep -iE \"\\\\.\\(png|jpg|jpeg|webp\\)\" | head)",
+      "Read(//c/Users/jack/Downloads/**)",
+      "Read(//c/Users/jack/**)",
+      "Bash(rm -f _favicon_candidate.png)",
+      "Bash(git commit -q -m 'Add Scaffold Visualiser logo: favicon + on-site branding *)"
     ]
   }
 }
