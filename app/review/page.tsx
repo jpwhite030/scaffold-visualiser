@@ -377,19 +377,22 @@ function FootprintEditor({ footprint, imageDataUrl, worldWidth, worldDepth, onCh
   const showImage = imageDataUrl && !imageDataUrl.startsWith('data:application/pdf');
 
   return (
-    <div
-      className="relative w-full overflow-hidden rounded border border-gray-300"
-      style={{ paddingTop: `${aspect * 100}%` }}
-    >
-      <button
-        type="button"
-        onClick={() => setDeleteMode(d => !d)}
-        className={`absolute top-2 right-2 z-10 text-xs font-semibold px-2.5 py-1 rounded-md border shadow-sm transition-colors ${
-          deleteMode ? 'bg-red-600 text-white border-red-600' : 'bg-white/90 text-gray-700 border-gray-300 hover:border-red-400'
-        }`}
+    <div>
+      <div className="flex items-center justify-end mb-2">
+        <button
+          type="button"
+          onClick={() => setDeleteMode(d => !d)}
+          className={`text-xs font-semibold px-3 py-1.5 rounded-md border shadow-sm transition-colors ${
+            deleteMode ? 'bg-red-600 text-white border-red-600' : 'bg-white text-gray-700 border-gray-300 hover:border-red-400'
+          }`}
+        >
+          {deleteMode ? 'Done deleting' : 'Delete points'}
+        </button>
+      </div>
+      <div
+        className="relative w-full overflow-hidden rounded border border-gray-300"
+        style={{ paddingTop: `${aspect * 100}%` }}
       >
-        {deleteMode ? 'Done deleting' : 'Delete points'}
-      </button>
       {showImage ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -475,6 +478,7 @@ function FootprintEditor({ footprint, imageDataUrl, worldWidth, worldDepth, onCh
           );
         })}
       </svg>
+      </div>
     </div>
   );
 }
