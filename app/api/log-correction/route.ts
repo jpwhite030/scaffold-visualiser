@@ -40,16 +40,17 @@ export async function POST(request: NextRequest) {
 
     const key = `corrections/${record.capturedAt.replace(/[:.]/g, '-')}-${Math.random().toString(36).slice(2, 8)}.json`;
 
-    await put(key, JSON.stringify(record), {
-      access: 'private',
+    const blob = await put(key, JSON.stringify(record), {
+      access: 'public',                // 'private' silently failed to write
       contentType: 'application/json',
-      addRandomSuffix: false,
+      addRandomSuffix: true,           // unguessable URL
     });
 
-    return Response.json({ ok: true });
+    return Response.json({ ok: true, url: blob.url });
   } catch (err) {
     console.error('log-correction error:', err);
-    // Never surface an error to the client — logging is best-effort.
-    return Response.json({ ok: false });
+    // Surface the reason (still a 200 so the client flow never breaks) so this
+    // is debuggable from the network tab.
+    return Response.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
   }
 }
