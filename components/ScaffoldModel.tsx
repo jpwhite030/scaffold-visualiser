@@ -497,17 +497,26 @@ function buildScaffold(data: BuildingData) {
   const stairRYs = Array.from({ length: Math.ceil(stairH / 0.5) }, (_, i) => (i + 1) * 0.5)
                     .filter(y => y <= stairH + 0.01);
 
-  // Frame along edge 0: u along the wall, n the outward normal (away from building).
-  const auX = oPoly[1][0] - oPoly[0][0], auZ = oPoly[1][1] - oPoly[0][1];
+  // Put the tower on the straightest run — the longest outer edge.
+  let ai = 0, bestLen = -1;
+  for (let i = 0; i < nEdges; i++) {
+    const j = (i + 1) % nEdges;
+    const L = Math.hypot(oPoly[j][0] - oPoly[i][0], oPoly[j][1] - oPoly[i][1]);
+    if (L > bestLen) { bestLen = L; ai = i; }
+  }
+  const ai1 = (ai + 1) % nEdges;
+
+  // Frame along that edge: u along the wall, n the outward normal (away from building).
+  const auX = oPoly[ai1][0] - oPoly[ai][0], auZ = oPoly[ai1][1] - oPoly[ai][1];
   const auL = Math.hypot(auX, auZ) || 1;
   const ux = auX / auL, uz = auZ / auL;
-  const nx = uz, nz = -ux;                 // outward normal of edge 0
+  const nx = uz, nz = -ux;                 // outward normal of the chosen edge
   const uRot = hRot(ux, uz), nRot = hRot(nx, nz);
   const nAngle = hAngle(nx, nz);
 
-  // Start a little along the wall from the corner so the tower clears it.
-  const startOff = Math.min(0.6, Math.max(0, auL - TW_GOING - 0.3));
-  const Sx = oPoly[0][0] + ux * startOff, Sz = oPoly[0][1] + uz * startOff;
+  // Centre the tower along the run (clearly mid-wall, clear of both corners).
+  const startOff = Math.max(0.3, (auL - TW_GOING) / 2);
+  const Sx = oPoly[ai][0] + ux * startOff, Sz = oPoly[ai][1] + uz * startOff;
   // Tower point at going-fraction fa (along wall) and depth-fraction fb (outward).
   const tp = (fa: number, fb: number): [number, number] =>
     [Sx + ux * TW_GOING * fa + nx * TW_DEPTH * fb, Sz + uz * TW_GOING * fa + nz * TW_DEPTH * fb];
