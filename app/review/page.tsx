@@ -139,7 +139,7 @@ export default function ReviewPage() {
         <div className="mb-6 bg-white rounded-xl border border-gray-200 p-4">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Footprint Editor</p>
           <p className="text-xs text-gray-400 mb-3">
-            1. Enter the actual building width &amp; depth from the plan below. 2. Drag orange dots to corners. 3. Click <span className="font-semibold text-orange-400">+</span> on any edge to add a corner. Double-click a dot to remove it.
+            1. Enter the actual building width &amp; depth from the plan below. 2. Drag orange dots to corners. 3. Click <span className="font-semibold text-orange-400">+</span> on any edge to add a corner. 4. Tap <span className="font-semibold text-red-500">Delete points</span> then tap any dot to remove it.
           </p>
           <div className="grid grid-cols-2 gap-3 mb-3">
             <Field
@@ -301,6 +301,7 @@ function FootprintEditor({ footprint, imageDataUrl, worldWidth, worldDepth, onCh
   onChange: (fp: [number, number][]) => void;
 }) {
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [deleteMode, setDeleteMode] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
 
   // Refs stay fresh across renders — essential because pointer events can fire
@@ -349,15 +350,12 @@ function FootprintEditor({ footprint, imageDataUrl, worldWidth, worldDepth, onCh
       const sy = Math.max(R, Math.min(VHc - R, ((e.clientY - rect.top)  / rect.height) * VHc));
       const wx = ((sx / VW   - PAD) / (1 - 2 * PAD) - 0.5) * safeWRef.current;
       const wz = ((sy / VHc  - PAD) / (1 - 2 * PAD) - 0.5) * safeDRef.current;
-      // Only reject a near-exact overlap (would make a zero-length edge).
-      const tooClose = footprintRef.current.some(
-        ([ox, oz], i) => i !== idx && Math.hypot(ox - wx, oz - wz) < 0.05
+      // Always follow the cursor — no overlap guard. The old proximity check
+      // silently dropped moves near other points, which made dots stick / snap
+      // back ("rubberband"). Overlaps are harmless and easy to drag apart.
+      onChangeRef.current(
+        footprintRef.current.map((pt, i) => (i === idx ? [wx, wz] : pt) as [number, number])
       );
-      if (!tooClose) {
-        onChangeRef.current(
-          footprintRef.current.map((pt, i) => (i === idx ? [wx, wz] : pt) as [number, number])
-        );
-      }
     };
     const onUp = () => {
       if (dragIdxRef.current !== null) {
@@ -383,6 +381,15 @@ function FootprintEditor({ footprint, imageDataUrl, worldWidth, worldDepth, onCh
       className="relative w-full overflow-hidden rounded border border-gray-300"
       style={{ paddingTop: `${aspect * 100}%` }}
     >
+      <button
+        type="button"
+        onClick={() => setDeleteMode(d => !d)}
+        className={`absolute top-2 right-2 z-10 text-xs font-semibold px-2.5 py-1 rounded-md border shadow-sm transition-colors ${
+          deleteMode ? 'bg-red-600 text-white border-red-600' : 'bg-white/90 text-gray-700 border-gray-300 hover:border-red-400'
+        }`}
+      >
+        {deleteMode ? 'Done deleting' : 'Delete points'}
+      </button>
       {showImage ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -414,8 +421,8 @@ function FootprintEditor({ footprint, imageDataUrl, worldWidth, worldDepth, onCh
           strokeLinejoin="round"
         />
 
-        {/* + buttons at edge midpoints — click to insert a new corner */}
-        {footprint.map(([x, z], i) => {
+        {/* + buttons at edge midpoints — click to insert a new corner (hidden while deleting) */}
+        {!deleteMode && footprint.map(([x, z], i) => {
           const [x2, z2] = footprint[(i + 1) % footprint.length];
           const mx = (x + x2) / 2, mz = (z + z2) / 2;
           const [sx, sy] = toSvg(mx, mz);
@@ -438,26 +445,31 @@ function FootprintEditor({ footprint, imageDataUrl, worldWidth, worldDepth, onCh
           );
         })}
 
-        {/* Draggable corner dots — double-click to delete */}
+        {/* Corner dots — drag to move, or tap to delete in delete mode */}
         {footprint.map(([x, z], i) => {
           const [sx, sy] = toSvg(x, z);
+          const canDelete = footprint.length > 4;
           return (
             <circle
               key={i}
               cx={sx} cy={sy}
               r={dragIdx === i ? 24 : 18}
-              fill={dragIdx === i ? '#ea580c' : '#f97316'}
+              fill={deleteMode ? (canDelete ? '#dc2626' : '#fca5a5') : dragIdx === i ? '#ea580c' : '#f97316'}
               stroke="white"
               strokeWidth="5"
-              style={{ cursor: dragIdx !== null ? 'grabbing' : 'grab', touchAction: 'none' }}
+              style={{ cursor: deleteMode ? 'pointer' : (dragIdx !== null ? 'grabbing' : 'grab'), touchAction: 'none' }}
               onPointerDown={e => {
                 e.preventDefault();
+                e.stopPropagation();
+                if (deleteMode) {
+                  // Keep at least 4 points (a valid rectangle minimum).
+                  if (footprintRef.current.length > 4) {
+                    onChangeRef.current(footprintRef.current.filter((_, fi) => fi !== i));
+                  }
+                  return;
+                }
                 dragIdxRef.current = i;
                 setDragIdx(i);
-              }}
-              onDoubleClick={e => {
-                e.preventDefault();
-                if (footprint.length > 4) onChange(footprint.filter((_, fi) => fi !== i));
               }}
             />
           );
