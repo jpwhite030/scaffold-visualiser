@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid, Environment } from '@react-three/drei';
+import { useState, useEffect } from 'react';
+import * as THREE from 'three';
+import { Canvas, useThree } from '@react-three/fiber';
+import { OrbitControls, Grid, Environment, SoftShadows } from '@react-three/drei';
 import { useRouter } from 'next/navigation';
 import { BuildingData, footprintBounds } from '@/lib/buildingTypes';
 import { computeGearList, GearList } from '@/lib/gearList';
@@ -81,15 +82,33 @@ export default function ViewerClient({ data }: { data: BuildingData }) {
         </p>
       </div>
 
-      <Canvas shadows camera={{ position: [cameraDistance, cameraHeight, cameraDistance], fov: 45 }} gl={{ antialias: true }}>
-        <color attach="background" args={['#1a1e2b']} />
-        <ambientLight intensity={0.4} />
-        <directionalLight position={[15, 20, 10]} intensity={1.5} castShadow
-          shadow-mapSize={[2048, 2048]} shadow-camera-far={100}
-          shadow-camera-left={-30} shadow-camera-right={30}
-          shadow-camera-top={30} shadow-camera-bottom={-30} />
-        <hemisphereLight args={['#b0c4ff', '#556644', 0.3]} />
-        <Grid args={[80, 80]} position={[0, -0.01, 0]} cellColor="#3a3f50" sectionColor="#505570" fadeDistance={60} infiniteGrid />
+      <Canvas shadows camera={{ position: [cameraDistance, cameraHeight, cameraDistance], fov: 45 }}
+        gl={{ antialias: true, toneMappingExposure: 1.05 }}>
+        {/* Smooth vertical gradient backdrop instead of a flat fill */}
+        <GradientBackground top="#0d1322" bottom="#2b3a57" />
+
+        {/* Soft, penumbra shadows for a realistic rendered look */}
+        <SoftShadows size={26} samples={16} focus={0.9} />
+
+        <ambientLight intensity={0.45} />
+        {/* Warm key light */}
+        <directionalLight position={[20, 28, 16]} intensity={2.6} color="#fff3e2" castShadow
+          shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} shadow-normalBias={0.02}
+          shadow-camera-far={140}
+          shadow-camera-left={-40} shadow-camera-right={40}
+          shadow-camera-top={40} shadow-camera-bottom={-40} />
+        {/* Cool fill from the opposite side to lift the shadows */}
+        <directionalLight position={[-18, 12, -14]} intensity={0.55} color="#cdddff" />
+        <hemisphereLight args={['#dcebff', '#5c6347', 0.55]} />
+
+        {/* Ground plane that catches only the soft shadow — grid shows through */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+          <planeGeometry args={[400, 400]} />
+          <shadowMaterial transparent opacity={0.32} />
+        </mesh>
+
+        <Grid args={[80, 80]} position={[0, -0.02, 0]} cellColor="#33394a" sectionColor="#4a5570"
+          fadeDistance={65} fadeStrength={1.5} infiniteGrid />
         <Environment preset="city" />
         <group>
           {showHouse && <HouseModel data={data} />}
@@ -99,6 +118,33 @@ export default function ViewerClient({ data }: { data: BuildingData }) {
       </Canvas>
     </div>
   );
+}
+
+// Paints a smooth vertical gradient as the scene background using a canvas
+// texture — deterministic top→bottom colours, no orientation guesswork.
+function GradientBackground({ top, bottom }: { top: string; bottom: string }) {
+  const { scene } = useThree();
+  useEffect(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 2;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const grad = ctx.createLinearGradient(0, 0, 0, 512);
+    grad.addColorStop(0, top);
+    grad.addColorStop(1, bottom);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 2, 512);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const prev = scene.background;
+    scene.background = tex;
+    return () => {
+      scene.background = prev;
+      tex.dispose();
+    };
+  }, [scene, top, bottom]);
+  return null;
 }
 
 function ToggleBtn({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {

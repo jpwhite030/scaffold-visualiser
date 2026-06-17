@@ -161,7 +161,7 @@ function TubeMesh({ t }: { t: Tube }) {
   return (
     <mesh position={[t.x, t.y, t.z]} rotation={t.rot} castShadow>
       <cylinderGeometry args={[t.r ?? TUBE_R, t.r ?? TUBE_R, t.length, SEG]} />
-      <meshStandardMaterial color={KS_TUBE} metalness={0.6} roughness={0.3} />
+      <meshStandardMaterial color={KS_TUBE} metalness={0.65} roughness={0.34} envMapIntensity={1.15} />
     </mesh>
   );
 }
@@ -173,7 +173,7 @@ function RosetteNode({ x, y, z }: RosettePos) {
       {/* Octagonal base plate */}
       <mesh>
         <cylinderGeometry args={[0.046, 0.046, 0.011, 8]} />
-        <meshStandardMaterial color={KS_ROSETTE} metalness={0.65} roughness={0.2} />
+        <meshStandardMaterial color={KS_ROSETTE} metalness={0.65} roughness={0.2} envMapIntensity={1.2} />
       </mesh>
       {/* 8 blade slots radiating outward — Kwikstage star */}
       {Array.from({ length: 8 }, (_, i) => {
@@ -181,7 +181,7 @@ function RosetteNode({ x, y, z }: RosettePos) {
         return (
           <mesh key={i} position={[Math.cos(a) * 0.052, 0, Math.sin(a) * 0.052]} rotation={[0, a, 0]}>
             <boxGeometry args={[0.018, 0.011, 0.014]} />
-            <meshStandardMaterial color={KS_ROSETTE} metalness={0.65} roughness={0.2} />
+            <meshStandardMaterial color={KS_ROSETTE} metalness={0.65} roughness={0.2} envMapIntensity={1.2} />
           </mesh>
         );
       })}
@@ -619,7 +619,7 @@ export default function ScaffoldModel({ data }: { data: BuildingData }) {
       {boards.map((b, i) => (
         <mesh key={`b${i}`} position={[b.cx, b.cy, b.cz]} rotation={[0, b.rotY, 0]} castShadow>
           <boxGeometry args={[b.length, 0.038, b.depth]} />
-          <meshStandardMaterial color={KS_BOARD} metalness={0.45} roughness={0.5} />
+          <meshStandardMaterial color={KS_BOARD} metalness={0.5} roughness={0.55} envMapIntensity={0.9} />
         </mesh>
       ))}
 
