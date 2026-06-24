@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages';
 import { NextRequest } from 'next/server';
 import { centerFootprint, ensureCCW } from '@/lib/buildingTypes';
+import { guard } from '@/lib/apiGuard';
 
 const client = new Anthropic();
 type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
@@ -92,6 +93,11 @@ PRECISION — the polygon must match the plan, not approximate it:
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
+  // Costly endpoint (spends Anthropic credits) — keep callers same-origin and
+  // rate-limited so the key can't be scripted now the login gate is gone.
+  const blocked = guard(request, { limit: 10, windowMs: 60_000 });
+  if (blocked) return blocked;
+
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;

@@ -1,5 +1,6 @@
 import { put } from '@vercel/blob';
 import { NextRequest } from 'next/server';
+import { guard } from '@/lib/apiGuard';
 
 // Silently captures footprint corrections as a training dataset:
 // (plan image, the AI's original outline, the user's corrected outline).
@@ -20,6 +21,10 @@ interface CorrectionPayload {
 }
 
 export async function POST(request: NextRequest) {
+  // Writes to Blob storage — same-origin + rate-limited so it can't be spammed.
+  const blocked = guard(request, { limit: 30, windowMs: 60_000 });
+  if (blocked) return blocked;
+
   try {
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
       // Storage not configured yet — accept and discard so the client flow is unaffected.

@@ -1,10 +1,16 @@
 import { list } from '@vercel/blob';
+import type { NextRequest } from 'next/server';
+import { guard } from '@/lib/apiGuard';
 
-// Lists the captured footprint corrections (behind the login gate via proxy.ts).
+// Lists the captured footprint corrections.
 // Used by the /corrections viewer to confirm logging works and to pull the data.
 export const maxDuration = 30;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Same-origin + rate-limited so the dataset listing isn't trivially scraped.
+  const blocked = guard(request, { limit: 30, windowMs: 60_000 });
+  if (blocked) return blocked;
+
   try {
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
       return Response.json({ ok: false, reason: 'storage_not_configured', count: 0, items: [] });

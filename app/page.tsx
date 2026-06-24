@@ -3,7 +3,6 @@
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BuildingData } from '@/lib/buildingTypes';
-import { logout } from './login/actions';
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
@@ -88,11 +87,6 @@ export default function UploadPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
-      <form action={logout} className="absolute top-4 right-4">
-        <button type="submit" className="text-sm text-gray-400 hover:text-gray-600 hover:underline">
-          Sign out
-        </button>
-      </form>
       <div className="w-full max-w-xl">
         <div className="text-center mb-10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
