@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import * as THREE from 'three';
 import { BuildingData, ensureCCW } from '@/lib/buildingTypes';
 
@@ -157,31 +157,28 @@ interface RosettePos { x: number; y: number; z: number }
 
 // ── Renderers ────────────────────────────────────────────────────────────────
 
-function TubeMesh({ t }: { t: Tube }) {
+function TubeMesh({ t, mat }: { t: Tube; mat: THREE.Material }) {
   return (
-    <mesh position={[t.x, t.y, t.z]} rotation={t.rot} castShadow>
+    <mesh position={[t.x, t.y, t.z]} rotation={t.rot} castShadow material={mat}>
       <cylinderGeometry args={[t.r ?? TUBE_R, t.r ?? TUBE_R, t.length, SEG]} />
-      <meshStandardMaterial color={KS_TUBE} metalness={0.65} roughness={0.34} envMapIntensity={1.15} />
     </mesh>
   );
 }
 
 // Kwikstage star rosette — octagonal plate + 4 blade tabs at 45° intervals
-function RosetteNode({ x, y, z }: RosettePos) {
+function RosetteNode({ x, y, z, mat }: RosettePos & { mat: THREE.Material }) {
   return (
     <group position={[x, y, z]}>
       {/* Octagonal base plate */}
-      <mesh>
+      <mesh material={mat}>
         <cylinderGeometry args={[0.046, 0.046, 0.011, 8]} />
-        <meshStandardMaterial color={KS_ROSETTE} metalness={0.65} roughness={0.2} envMapIntensity={1.2} />
       </mesh>
       {/* 8 blade slots radiating outward — Kwikstage star */}
       {Array.from({ length: 8 }, (_, i) => {
         const a = (i * Math.PI) / 4;
         return (
-          <mesh key={i} position={[Math.cos(a) * 0.052, 0, Math.sin(a) * 0.052]} rotation={[0, a, 0]}>
+          <mesh key={i} position={[Math.cos(a) * 0.052, 0, Math.sin(a) * 0.052]} rotation={[0, a, 0]} material={mat}>
             <boxGeometry args={[0.018, 0.011, 0.014]} />
-            <meshStandardMaterial color={KS_ROSETTE} metalness={0.65} roughness={0.2} envMapIntensity={1.2} />
           </mesh>
         );
       })}
@@ -607,40 +604,67 @@ function buildScaffold(data: BuildingData) {
 export default function ScaffoldModel({ data }: { data: BuildingData }) {
   const { tubes, boards, kickboards, rosettes, basePts } = useMemo(() => buildScaffold(data), [data]);
 
+  // One shared material per part type — galvanised-steel PBR with a faint
+  // clearcoat so the city Environment reads as a real metallic sheen rather
+  // than flat colour. Shared instances also mean a single shader program for
+  // hundreds of tubes instead of one material allocation per mesh.
+  const mats = useMemo(() => ({
+    // Standards / ledgers / transoms / rails / bracing.
+    tube: new THREE.MeshPhysicalMaterial({
+      color: KS_TUBE, metalness: 0.9, roughness: 0.36,
+      clearcoat: 0.35, clearcoatRoughness: 0.45, envMapIntensity: 1.2,
+    }),
+    // Rosette stars — brighter, crisper galvanised finish.
+    rosette: new THREE.MeshPhysicalMaterial({
+      color: KS_ROSETTE, metalness: 0.9, roughness: 0.26,
+      clearcoat: 0.45, clearcoatRoughness: 0.4, envMapIntensity: 1.3,
+    }),
+    // Perforated steel deck boards — galvanised, less mirror-like than the tubes.
+    board: new THREE.MeshPhysicalMaterial({
+      color: KS_BOARD, metalness: 0.7, roughness: 0.5,
+      clearcoat: 0.2, clearcoatRoughness: 0.6, envMapIntensity: 1.0,
+    }),
+    // Painted timber/steel toe boards — matte, hardly reflective.
+    toe: new THREE.MeshStandardMaterial({ color: '#caa24a', metalness: 0.2, roughness: 0.7 }),
+    basePlate: new THREE.MeshStandardMaterial({ color: '#777', metalness: 0.55, roughness: 0.45 }),
+    jack: new THREE.MeshPhysicalMaterial({
+      color: '#8a8a8a', metalness: 0.85, roughness: 0.3, clearcoat: 0.3, envMapIntensity: 1.1,
+    }),
+  }), []);
+
+  // Free the GPU material resources when the model unmounts / data changes.
+  useEffect(() => () => { Object.values(mats).forEach(m => m.dispose()); }, [mats]);
+
   return (
     <group>
       {/* All steel tubes — standards, ledgers, transoms, rails, bracing */}
-      {tubes.map((t, i) => <TubeMesh key={i} t={t} />)}
+      {tubes.map((t, i) => <TubeMesh key={i} t={t} mat={mats.tube} />)}
 
       {/* Kwikstage star rosettes at every 500 mm on each standard */}
-      {rosettes.map((r, i) => <RosetteNode key={`r${i}`} {...r} />)}
+      {rosettes.map((r, i) => <RosetteNode key={`r${i}`} {...r} mat={mats.rosette} />)}
 
       {/* Flat perforated steel boards */}
       {boards.map((b, i) => (
-        <mesh key={`b${i}`} position={[b.cx, b.cy, b.cz]} rotation={[0, b.rotY, 0]} castShadow>
+        <mesh key={`b${i}`} position={[b.cx, b.cy, b.cz]} rotation={[0, b.rotY, 0]} castShadow material={mats.board}>
           <boxGeometry args={[b.length, 0.038, b.depth]} />
-          <meshStandardMaterial color={KS_BOARD} metalness={0.5} roughness={0.55} envMapIntensity={0.9} />
         </mesh>
       ))}
 
       {/* Kickboards / toe boards — vertical boards on deck edges above 2 m */}
       {kickboards.map((k, i) => (
-        <mesh key={`k${i}`} position={[k.cx, k.cy, k.cz]} rotation={[0, k.rotY, 0]} castShadow>
+        <mesh key={`k${i}`} position={[k.cx, k.cy, k.cz]} rotation={[0, k.rotY, 0]} castShadow material={mats.toe}>
           <boxGeometry args={[k.length, KB_H, KB_T]} />
-          <meshStandardMaterial color="#caa24a" metalness={0.2} roughness={0.7} />
         </mesh>
       ))}
 
       {/* Base plates + screw jacks */}
       {basePts.map(([x, z], i) => (
         <group key={`bp${i}`}>
-          <mesh position={[x, 0.02, z]}>
+          <mesh position={[x, 0.02, z]} material={mats.basePlate}>
             <boxGeometry args={[0.18, 0.04, 0.18]} />
-            <meshStandardMaterial color="#777" metalness={0.55} roughness={0.45} />
           </mesh>
-          <mesh position={[x, 0.14, z]}>
+          <mesh position={[x, 0.14, z]} material={mats.jack}>
             <cylinderGeometry args={[0.016, 0.016, 0.22, 8]} />
-            <meshStandardMaterial color="#888" metalness={0.6} roughness={0.3} />
           </mesh>
         </group>
       ))}
