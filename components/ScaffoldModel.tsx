@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { BuildingData, ensureCCW } from '@/lib/buildingTypes';
 
@@ -155,6 +155,10 @@ interface KickBoard {
 // Kwikstage rosette star — position only; rendered as a component
 interface RosettePos { x: number; y: number; z: number }
 
+// A positioned, Y-rotated box instance — reused for forged connector heads,
+// deck-batten end hooks, and any other small repeated part rendered instanced.
+interface BoxXform { x: number; y: number; z: number; rotY: number }
+
 // ── Renderers ────────────────────────────────────────────────────────────────
 
 function TubeMesh({ t, mat }: { t: Tube; mat: THREE.Material }) {
@@ -183,6 +187,36 @@ function RosetteNode({ x, y, z, mat }: RosettePos & { mat: THREE.Material }) {
         );
       })}
     </group>
+  );
+}
+
+// Draw many identical Y-rotated boxes as ONE instanced mesh — a single draw
+// call for what would otherwise be hundreds of tiny meshes (connector heads,
+// deck-batten hooks, …). `size` is the shared box geometry for every instance.
+function InstancedBoxes({ items, size, mat }: { items: BoxXform[]; size: [number, number, number]; mat: THREE.Material }) {
+  const ref = useRef<THREE.InstancedMesh>(null);
+  useEffect(() => {
+    const mesh = ref.current;
+    if (!mesh) return;
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const e = new THREE.Euler();
+    const s = new THREE.Vector3(1, 1, 1);
+    const p = new THREE.Vector3();
+    items.forEach((c, i) => {
+      p.set(c.x, c.y, c.z);
+      q.setFromEuler(e.set(0, c.rotY, 0));
+      mesh.setMatrixAt(i, m.compose(p, q, s));
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
+  }, [items]);
+
+  if (items.length === 0) return null;
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, items.length]} castShadow material={mat}>
+      <boxGeometry args={size} />
+    </instancedMesh>
   );
 }
 
@@ -259,6 +293,8 @@ function buildScaffold(data: BuildingData) {
   const boards: Board[]         = [];
   const kickboards: KickBoard[] = [];
   const rosettes: RosettePos[]  = [];
+  const connectors: BoxXform[]  = [];
+  const boardHooks: BoxXform[]  = [];
   const basePts: [number, number][] = [];
 
   // Top-deck protection mode:
@@ -407,8 +443,26 @@ function buildScaffold(data: BuildingData) {
         ? [...new Set([...uniformLedgerYs, leftBayTopY, rightBayTopY])].sort((a, b) => a - b)
         : allLedgerYs;
 
-      for (const y of ySet)
+      // Transom heads point along the transom (perpendicular to the face).
+      const tAngle = hAngle(outX, outZ);
+      for (const y of ySet) {
         tubes.push({ x: tcx, y, z: tcz, length: tLen, rot: tRot });
+        connectors.push({ x: ox, y, z: oz, rotY: tAngle });
+        connectors.push({ x: ix, y, z: iz, rotY: tAngle });
+      }
+    }
+
+    // ── Wall ties — short tubes anchoring the inner standards back to the
+    // building, at roughly every second standard and every ~4 m of height (a
+    // typical tie pattern). They bridge the 0.2 m gap to the wall so the
+    // scaffold reads as tied to the structure rather than standing free.
+    const tieRot = hRot(outX, outZ);
+    for (let k = 0; k <= numBays; k += 2) {
+      const [ix, iz] = iPts[k];
+      const tcx = ix - outX * (INNER / 2), tcz = iz - outZ * (INNER / 2);
+      for (let ty = 2.0; ty <= totalH - 0.4; ty += 4.0) {
+        tubes.push({ x: tcx, y: ty, z: tcz, length: INNER, rot: tieRot });
+      }
     }
 
     // ── Per bay: ledgers, platforms, bracing ──────────────────────────────────
@@ -437,20 +491,30 @@ function buildScaffold(data: BuildingData) {
       for (const y of bayAllLedgerYs) {
         tubes.push({ x: ocx, y, z: ocz, length: bLen, rot });
         tubes.push({ x: icx, y, z: icz, length: bLen, rot });
+        // Forged heads where each ledger end clamps onto its standard's rosette.
+        connectors.push({ x: ox1, y, z: oz1, rotY: angle });
+        connectors.push({ x: ox2, y, z: oz2, rotY: angle });
+        connectors.push({ x: ix1, y, z: iz1, rotY: angle });
+        connectors.push({ x: ix2, y, z: iz2, rotY: angle });
       }
 
       for (const y of bayLiftYs) {
         const midX = (ocx + icx) / 2, midZ = (ocz + icz) / 2;
         for (let b = 0; b < PLANK_COUNT; b++) {
           const offset = (b - (PLANK_COUNT - 1) / 2) * plankW;
+          const pcx = midX + outX * offset, pcz = midZ + outZ * offset;
           boards.push({
-            cx: midX + outX * offset,
+            cx: pcx,
             cy: y + 0.022,
-            cz: midZ + outZ * offset,
+            cz: pcz,
             length: bLen,
             depth: plankW - plankGap,
             rotY: angle,
           });
+          // Down-turned hooks at each batten end, draped over the transom below.
+          for (const sgn of [-1, 1]) {
+            boardHooks.push({ x: pcx + ux * sgn * (bLen / 2), y: y + 0.005, z: pcz + uz * sgn * (bLen / 2), rotY: angle });
+          }
         }
         // Kickboard (toe board) on the OUTER edge of every deck — the open/fall
         // side. The inner edge sits against the building, so no toe board there.
@@ -471,10 +535,15 @@ function buildScaffold(data: BuildingData) {
         const segH = yTop - yBot;
         const midY = (yBot + yTop) / 2;
         const diagLen = Math.hypot(bLen, segH);
-        if (j % 3 === 0) {
-          tubes.push({ x: ocx, y: midY, z: ocz, length: diagLen, rot: dirRot(ox2 - ox1, segH, oz2 - oz1), r: BRACE_R });
-        } else if (j % 3 === 1) {
-          tubes.push({ x: ocx, y: midY, z: ocz, length: diagLen, rot: dirRot(ox1 - ox2, segH, oz1 - oz2), r: BRACE_R });
+        const m3 = j % 3;
+        if (m3 === 0 || m3 === 1) {
+          const fwd = m3 === 0;   // which way the diagonal leans this bay
+          tubes.push({ x: ocx, y: midY, z: ocz, length: diagLen,
+            rot: dirRot(fwd ? ox2 - ox1 : ox1 - ox2, segH, fwd ? oz2 - oz1 : oz1 - oz2), r: BRACE_R });
+          // Swivel couplers clamping each brace end to its outer standard. Same
+          // hardware as the ledger heads, so they ride the connector instance mesh.
+          connectors.push({ x: fwd ? ox1 : ox2, y: yBot, z: fwd ? oz1 : oz2, rotY: angle });
+          connectors.push({ x: fwd ? ox2 : ox1, y: yTop, z: fwd ? oz2 : oz1, rotY: angle });
         }
       }
     }
@@ -538,14 +607,15 @@ function buildScaffold(data: BuildingData) {
     }
   }
 
-  // Roof-edge protection: guardrails on all four sides of the tower top. Each
-  // standard extends a rail's height above the top deck (the posts), with a top
-  // and mid rail running right around the perimeter.
+  // Roof-edge protection: guardrails on all four sides of the tower top, using
+  // the SAME protection mode as the main scaffold (4 rails on roof catch, 2 on
+  // edge protection) so the access tower is just as safe to fall against. The
+  // posts extend tall enough (postExt) to carry the full rail set.
   for (const fb of [0, 1]) for (const fa of [0, 1]) {
     const [bx, bz] = tp(fa, fb);
-    tubes.push({ x: bx, y: stairH + RAIL_HI / 2, z: bz, length: RAIL_HI, rot: [0, 0, 0] });
+    tubes.push({ x: bx, y: stairH + postExt / 2, z: bz, length: postExt, rot: [0, 0, 0] });
   }
-  for (const ry of [RAIL_LO, RAIL_HI]) {
+  for (const ry of topRailYs) {
     for (const fb of [0, 1]) {
       const [a0x, a0z] = tp(0, fb), [a1x, a1z] = tp(1, fb);
       tubes.push({ x: (a0x + a1x) / 2, y: stairH + ry, z: (a0z + a1z) / 2, length: TW_GOING, rot: uRot, r: RAIL_R });
@@ -590,47 +660,82 @@ function buildScaffold(data: BuildingData) {
       }
       const [lx, lz] = tp(aE, 0.5);   // landing at top of flight
       boards.push({ cx: lx, cy: yTop + 0.022, cz: lz, length: TW_DEPTH * 0.92, depth: 0.45, rotY: nAngle });
-      const [h0x, h0z] = tp(aS, 1), [h1x, h1z] = tp(aE, 1);   // outer handrail
-      tubes.push({ x: (h0x + h1x) / 2, y: (yBot + yTop) / 2 + RAIL_HI, z: (h0z + h1z) / 2,
-        length: Math.hypot(TW_GOING, segH), rot: dirRot(h1x - h0x, segH, h1z - h0z), r: RAIL_R });
+      // Raking handrails — both sides of the flight, top + mid rail, following
+      // the stair slope (a person climbing has a rail on either hand).
+      for (const fb of [0, 1]) {
+        const [r0x, r0z] = tp(aS, fb), [r1x, r1z] = tp(aE, fb);
+        for (const ry of [RAIL_LO, RAIL_HI]) {
+          tubes.push({ x: (r0x + r1x) / 2, y: (yBot + yTop) / 2 + ry, z: (r0z + r1z) / 2,
+            length: Math.hypot(TW_GOING, segH), rot: dirRot(r1x - r0x, segH, r1z - r0z), r: RAIL_R });
+        }
+      }
     }
   }
 
-  return { tubes, boards, kickboards, rosettes, basePts };
+  return { tubes, boards, kickboards, rosettes, connectors, boardHooks, basePts };
+}
+
+// Procedural galvanised "spangle": a soft mottled greyscale used as a roughness
+// map so the steel surfaces catch light unevenly (shinier flecks) rather than
+// reading as flat colour. Canvas-based, so it only runs client-side — fine here
+// because the viewer mounts ScaffoldModel with ssr:false.
+function makeGalvTexture(): THREE.CanvasTexture {
+  const size = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d')!;
+  // Average near-white preserves each material's base roughness; the flecks
+  // dip the roughness locally to give the galvanised sparkle.
+  ctx.fillStyle = '#dcdcdc';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 1100; i++) {
+    const g = 200 + Math.floor(Math.random() * 55);
+    ctx.fillStyle = `rgba(${g},${g},${g},${(0.12 + Math.random() * 0.18).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(Math.random() * size, Math.random() * size, 1.5 + Math.random() * 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(3, 2);
+  return tex;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function ScaffoldModel({ data }: { data: BuildingData }) {
-  const { tubes, boards, kickboards, rosettes, basePts } = useMemo(() => buildScaffold(data), [data]);
+  const { tubes, boards, kickboards, rosettes, connectors, boardHooks, basePts } = useMemo(() => buildScaffold(data), [data]);
 
   // One shared material per part type — galvanised-steel PBR with a faint
   // clearcoat so the city Environment reads as a real metallic sheen rather
   // than flat colour. Shared instances also mean a single shader program for
   // hundreds of tubes instead of one material allocation per mesh.
-  const mats = useMemo(() => ({
-    // Standards / ledgers / transoms / rails / bracing.
-    tube: new THREE.MeshPhysicalMaterial({
-      color: KS_TUBE, metalness: 0.9, roughness: 0.36,
-      clearcoat: 0.35, clearcoatRoughness: 0.45, envMapIntensity: 1.2,
-    }),
-    // Rosette stars — brighter, crisper galvanised finish.
-    rosette: new THREE.MeshPhysicalMaterial({
-      color: KS_ROSETTE, metalness: 0.9, roughness: 0.26,
-      clearcoat: 0.45, clearcoatRoughness: 0.4, envMapIntensity: 1.3,
-    }),
-    // Perforated steel deck boards — galvanised, less mirror-like than the tubes.
-    board: new THREE.MeshPhysicalMaterial({
-      color: KS_BOARD, metalness: 0.7, roughness: 0.5,
-      clearcoat: 0.2, clearcoatRoughness: 0.6, envMapIntensity: 1.0,
-    }),
-    // Painted timber/steel toe boards — matte, hardly reflective.
-    toe: new THREE.MeshStandardMaterial({ color: '#caa24a', metalness: 0.2, roughness: 0.7 }),
-    basePlate: new THREE.MeshStandardMaterial({ color: '#777', metalness: 0.55, roughness: 0.45 }),
-    jack: new THREE.MeshPhysicalMaterial({
-      color: '#8a8a8a', metalness: 0.85, roughness: 0.3, clearcoat: 0.3, envMapIntensity: 1.1,
-    }),
-  }), []);
+  const mats = useMemo(() => {
+    // One shared galvanised-spangle roughness map across all the steel parts.
+    const galv = makeGalvTexture();
+    const steel = (color: string, o: Partial<THREE.MeshPhysicalMaterialParameters> = {}) =>
+      new THREE.MeshPhysicalMaterial({
+        color, metalness: 0.9, roughness: 0.36, clearcoat: 0.35, clearcoatRoughness: 0.45,
+        envMapIntensity: 1.2, roughnessMap: galv, ...o,
+      });
+    return {
+      // Standards / ledgers / transoms / rails / bracing.
+      tube: steel(KS_TUBE),
+      // Rosette stars — brighter, crisper galvanised finish.
+      rosette: steel(KS_ROSETTE, { roughness: 0.26, clearcoat: 0.45, clearcoatRoughness: 0.4, envMapIntensity: 1.3 }),
+      // Perforated steel deck boards — galvanised, less mirror-like than the tubes.
+      board: steel(KS_BOARD, { metalness: 0.7, roughness: 0.5, clearcoat: 0.2, clearcoatRoughness: 0.6, envMapIntensity: 1.0 }),
+      // Painted timber/steel toe boards — matte, hardly reflective.
+      toe: new THREE.MeshStandardMaterial({ color: '#caa24a', metalness: 0.2, roughness: 0.7 }),
+      basePlate: new THREE.MeshStandardMaterial({ color: '#777', metalness: 0.55, roughness: 0.45 }),
+      // Threaded jack / nut — galvanised steel like the tubes.
+      jack: steel('#8a8a8a', { metalness: 0.85, roughness: 0.3, clearcoat: 0.3, envMapIntensity: 1.1 }),
+      // Timber sole board under each leg — matte, no metalness.
+      sole: new THREE.MeshStandardMaterial({ color: '#7a5a39', metalness: 0, roughness: 0.9 }),
+      // Kept so the disposal effect frees the shared texture too.
+      galv,
+    };
+  }, []);
 
   // Free the GPU material resources when the model unmounts / data changes.
   useEffect(() => () => { Object.values(mats).forEach(m => m.dispose()); }, [mats]);
@@ -642,6 +747,12 @@ export default function ScaffoldModel({ data }: { data: BuildingData }) {
 
       {/* Kwikstage star rosettes at every 500 mm on each standard */}
       {rosettes.map((r, i) => <RosetteNode key={`r${i}`} {...r} mat={mats.rosette} />)}
+
+      {/* Forged ledger/transom heads clamped on the rosettes (instanced) */}
+      <InstancedBoxes items={connectors} size={[0.06, 0.092, 0.052]} mat={mats.tube} />
+
+      {/* Steel-batten end hooks draped over the transoms (instanced) */}
+      <InstancedBoxes items={boardHooks} size={[0.02, 0.07, 0.234]} mat={mats.board} />
 
       {/* Flat perforated steel boards */}
       {boards.map((b, i) => (
@@ -657,13 +768,24 @@ export default function ScaffoldModel({ data }: { data: BuildingData }) {
         </mesh>
       ))}
 
-      {/* Base plates + screw jacks */}
+      {/* Adjustable base jacks: timber sole board → steel plate → adjustment
+          nut → threaded rod (the standard seats on top of the rod). */}
       {basePts.map(([x, z], i) => (
         <group key={`bp${i}`}>
-          <mesh position={[x, 0.02, z]} material={mats.basePlate}>
-            <boxGeometry args={[0.18, 0.04, 0.18]} />
+          {/* Timber sole board spreading the load on the ground */}
+          <mesh position={[x, 0.008, z]} material={mats.sole} receiveShadow castShadow>
+            <boxGeometry args={[0.34, 0.016, 0.34]} />
           </mesh>
-          <mesh position={[x, 0.14, z]} material={mats.jack}>
+          {/* Steel base plate seated on the sole board */}
+          <mesh position={[x, 0.03, z]} material={mats.basePlate} castShadow>
+            <boxGeometry args={[0.18, 0.028, 0.18]} />
+          </mesh>
+          {/* Hex adjustment nut on the threaded jack */}
+          <mesh position={[x, 0.075, z]} material={mats.jack} castShadow>
+            <cylinderGeometry args={[0.034, 0.034, 0.03, 6]} />
+          </mesh>
+          {/* Threaded jack rod */}
+          <mesh position={[x, 0.16, z]} material={mats.jack} castShadow>
             <cylinderGeometry args={[0.016, 0.016, 0.22, 8]} />
           </mesh>
         </group>

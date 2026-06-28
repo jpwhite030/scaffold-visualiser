@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import * as THREE from 'three';
 import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, Grid, Environment, SoftShadows } from '@react-three/drei';
+import { OrbitControls, Grid, Environment, SoftShadows, ContactShadows } from '@react-three/drei';
 import { useRouter } from 'next/navigation';
 import { BuildingData, footprintBounds } from '@/lib/buildingTypes';
 import { computeGearList, GearList } from '@/lib/gearList';
@@ -19,6 +19,8 @@ export default function ViewerClient({ data }: { data: BuildingData }) {
 
   const bounds = footprintBounds(data.footprint);
   const diagH = Math.sqrt((bounds.maxX - bounds.minX) ** 2 + (bounds.maxZ - bounds.minZ) ** 2);
+  // Contact-shadow plane sized to the footprint plus the scaffold's standoff/margin.
+  const groundSpread = Math.max(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ) + 8;
   const cameraDistance = diagH * 1.8;
   const cameraHeight = cameraDistance * 0.55;
   const targetHeight = data.eave_height_m / 2;
@@ -87,6 +89,10 @@ export default function ViewerClient({ data }: { data: BuildingData }) {
         {/* Smooth vertical gradient backdrop instead of a flat fill */}
         <GradientBackground top="#0d1322" bottom="#2b3a57" />
 
+        {/* Gentle distance fog (matched to the gradient's lower tone) so the
+            ground and far grid melt into the horizon instead of ending hard. */}
+        <fog attach="fog" args={['#2b3a57', 70, 240]} />
+
         {/* Soft, penumbra shadows for a realistic rendered look */}
         <SoftShadows size={26} samples={16} focus={0.9} />
 
@@ -101,14 +107,24 @@ export default function ViewerClient({ data }: { data: BuildingData }) {
         <directionalLight position={[-18, 12, -14]} intensity={0.55} color="#cdddff" />
         <hemisphereLight args={['#dcebff', '#5c6347', 0.55]} />
 
-        {/* Ground plane that catches only the soft shadow — grid shows through */}
+        {/* Opaque ground so the scaffold sits on a real surface instead of
+            floating over a void — it receives the soft directional shadow
+            directly, giving proper contact shadows under the structure. */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
           <planeGeometry args={[400, 400]} />
-          <shadowMaterial transparent opacity={0.32} />
+          <meshStandardMaterial color="#39425a" roughness={0.97} metalness={0} />
         </mesh>
 
-        <Grid args={[80, 80]} position={[0, -0.02, 0]} cellColor="#33394a" sectionColor="#4a5570"
-          fadeDistance={65} fadeStrength={1.5} infiniteGrid />
+        {/* Faint site grid laid just over the ground for scale reference — no
+            longer the dominant element now there's a real ground beneath it. */}
+        <Grid args={[80, 80]} position={[0, 0.012, 0]} cellColor="#414b66" sectionColor="#586a92"
+          fadeDistance={55} fadeStrength={2} infiniteGrid />
+
+        {/* Soft ambient-occlusion shadow directly under the structure (baked
+            once — the scene is static), on top of the directional sun shadow. */}
+        <ContactShadows position={[0, 0.02, 0]} scale={groundSpread} resolution={1024}
+          blur={2.6} opacity={0.55} far={data.eave_height_m + 6} frames={1} color="#0a0e1a" />
+
         <Environment preset="city" />
         <group>
           {showHouse && <HouseModel data={data} />}
