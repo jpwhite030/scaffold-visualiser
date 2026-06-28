@@ -308,6 +308,21 @@ function buildScaffold(data: BuildingData) {
     : [RAIL_LO, RAIL_HI];       // 2 rails
   const postExt = protectionType === 'roof_catch' ? 2.0 : RAIL_HI;  // guardrail post height above top deck
 
+  // Auto-detect the gable-end faces of a rectangular gable roof so the scaffold
+  // steps up the rake automatically — matching HouseModel's ridge orientation.
+  // The ridge runs along the longer side; the two faces perpendicular to it are
+  // the gable ends. Explicit gable_faces toggles override this when present.
+  const gf = data.gable_faces ?? [];
+  const hasGableToggle = gf.some(g => g);
+  const xs = poly.map(p => p[0]), zs = poly.map(p => p[1]);
+  const ridgeAlongZ = (Math.max(...zs) - Math.min(...zs)) >= (Math.max(...xs) - Math.min(...xs));
+  const isGableEnd = (ei: number): boolean => {
+    if (data.roof_type !== 'gable' || nEdges !== 4) return false;
+    const [x1, z1] = poly[ei], [x2, z2] = poly[(ei + 1) % nEdges];
+    const runsAlongX = Math.abs(x2 - x1) > Math.abs(z2 - z1);
+    return ridgeAlongZ ? runsAlongX : !runsAlongX;   // perpendicular to the ridge
+  };
+
   for (let ei = 0; ei < nEdges; ei++) {
     const ei1 = (ei + 1) % nEdges;
 
@@ -374,7 +389,10 @@ function buildScaffold(data: BuildingData) {
     // Steps are counted from each corner inward: bay 0 = topDeckY, bay 1 = +500 mm,
     // bay 2 = +1000 mm … capped by the actual gable geometry so we never exceed
     // what the roof allows. Lower scaffold levels stay identical to eave faces.
-    const isGable  = data.roof_type !== 'flat' && ((data.gable_faces ?? [])[ei] ?? false);
+    // Step up if this face is toggled as a gable end, or — when no toggles are
+    // set — if it's auto-detected as a gable end of a gable roof.
+    const isGable  = data.roof_type !== 'flat' &&
+      (hasGableToggle ? (gf[ei] ?? false) : isGableEnd(ei));
     const halfLen  = len / 2;
     const pitchTan = isGable ? Math.tan((data.roof_pitch_degrees ?? 22) * Math.PI / 180) : 0;
 
