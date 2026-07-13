@@ -3,10 +3,17 @@
 import { useEffect, useRef, useState, RefObject } from 'react';
 import { useRouter } from 'next/navigation';
 import { BuildingData, footprintBounds } from '@/lib/buildingTypes';
+import { SiteData } from '@/lib/siteTypes';
 
 // ── Scaffold metrics ──────────────────────────────────────────────────────────
 
-function scaffoldMetrics(data: BuildingData) {
+interface Metrics {
+  perimeter: number;
+  numLifts: number;
+  maxEave: number;
+}
+
+function scaffoldMetrics(data: BuildingData): Metrics {
   const poly = data.footprint;
   let perimeter = 0;
   for (let i = 0; i < poly.length; i++) {
@@ -17,6 +24,15 @@ function scaffoldMetrics(data: BuildingData) {
   const maxEave   = data.eave_height_m;
   const numLifts  = maxEave > 4.0 ? 2 : 1;
   return { perimeter: Math.round(perimeter * 10) / 10, numLifts, maxEave };
+}
+
+function siteMetrics(site: SiteData, scaffolded: SiteData['buildings']): Metrics {
+  const per = scaffolded.map(b => scaffoldMetrics(b.data));
+  return {
+    perimeter: Math.round(per.reduce((s, m) => s + m.perimeter, 0) * 10) / 10,
+    numLifts:  per.reduce((m, x) => Math.max(m, x.numLifts), 1),
+    maxEave:   per.reduce((m, x) => Math.max(m, x.maxEave), 0),
+  };
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -128,25 +144,97 @@ function buildDefaultQuote(data: BuildingData): QuoteState {
   };
 }
 
+// ── Site quote — combined scope + one erect/dismantle line per building ──────
+
+function buildDefaultSiteQuote(site: SiteData): QuoteState {
+  const saved = loadCompany();
+  // Quote the buildings the user flagged for scaffold; if none are flagged,
+  // fall back to all of them so the quote is never empty.
+  const scaffolded = site.buildings.filter(b => b.scaffold_enabled);
+  const targets = scaffolded.length > 0 ? scaffolded : site.buildings;
+  const combined = siteMetrics(site, targets);
+
+  const summary = targets.map(b => {
+    const bb = footprintBounds(b.data.footprint);
+    return `${b.label} ${(bb.maxX - bb.minX).toFixed(1)}m × ${(bb.maxZ - bb.minZ).toFixed(1)}m`;
+  }).join(', ');
+
+  let hireTotal = 0;
+  const lines: QuoteLine[] = targets.map(b => {
+    const m = scaffoldMetrics(b.data);
+    const edRate = b.data.num_stories >= 2 ? 120 : 80;
+    hireTotal += (m.perimeter * (b.data.num_stories >= 2 ? 22 : 15));
+    return {
+      id: uid(),
+      description: `${b.label} — Kwikstage scaffold erect & dismantle\nFull perimeter ${m.perimeter}m, ${m.numLifts} lift${m.numLifts > 1 ? 's' : ''}, all labour and materials`,
+      qty: 1,
+      unit: 'job',
+      rate: Math.round((m.perimeter * edRate) / 100) * 100,
+    };
+  });
+  lines.push({
+    id: uid(),
+    description: 'Scaffold hire — all buildings',
+    qty: 4,
+    unit: 'week',
+    rate: Math.round(hireTotal / 10) * 10,
+  });
+
+  return {
+    companyName:  saved.companyName  ?? 'Skelscaff',
+    companyPhone: saved.companyPhone ?? '',
+    companyEmail: saved.companyEmail ?? 'jack@skelscaff.com.au',
+    companyABN:   saved.companyABN   ?? '',
+    clientName:    '',
+    clientAddress: '',
+    clientPhone:   '',
+    quoteNumber:  `Q-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 900) + 100)}`,
+    quoteDate:    todayAU(),
+    validDays:    30,
+    scopeDescription:
+      `Supply, erect, hire and dismantle Kwikstage scaffold to ${targets.length} building${targets.length > 1 ? 's' : ''} — ${summary}. ` +
+      `Lot ${site.site_width_m}m × ${site.site_depth_m}m, combined perimeter ${combined.perimeter}m, max eave ${combined.maxEave}m.`,
+    notes:
+      'All prices include GST.\nPayment terms: 50% deposit on commencement, balance on completion.\nHire period commences on erection date.\nAdditional weeks charged at the weekly rate above.',
+    lines,
+  };
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function QuotePage() {
   const router = useRouter();
-  const [data,  setData]  = useState<BuildingData | null>(null);
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [backTarget, setBackTarget] = useState('/viewer');
   const [quote, setQuote] = useState<QuoteState | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const mode = sessionStorage.getItem('quoteMode');
+    if (mode === 'site') {
+      const rawSite = sessionStorage.getItem('siteData');
+      if (rawSite) {
+        try {
+          const site: SiteData = JSON.parse(rawSite);
+          if (site.buildings?.length > 0) {
+            const scaffolded = site.buildings.filter(b => b.scaffold_enabled);
+            setMetrics(siteMetrics(site, scaffolded.length > 0 ? scaffolded : site.buildings));
+            setBackTarget('/site-viewer');
+            setQuote(buildDefaultSiteQuote(site));
+            return;
+          }
+        } catch { /* fall through to building quote */ }
+      }
+    }
     const raw = sessionStorage.getItem('buildingData');
     if (!raw) { router.push('/'); return; }
     const bd: BuildingData = JSON.parse(raw);
-    setData(bd);
+    setMetrics(scaffoldMetrics(bd));
     setQuote(buildDefaultQuote(bd));
   }, [router]);
 
-  if (!data || !quote) return <div className="min-h-screen bg-gray-50" />;
+  if (!metrics || !quote) return <div className="min-h-screen bg-gray-50" />;
 
-  const metrics  = scaffoldMetrics(data);
   const subtotal = quote.lines.reduce((s, l) => s + l.qty * l.rate, 0);
   const gst      = subtotal * 0.1;
   const total    = subtotal + gst;
@@ -191,7 +279,7 @@ export default function QuotePage() {
       {/* Toolbar — screen only */}
       <div className="no-print sticky top-0 z-20 bg-white border-b border-gray-200 px-5 py-3 flex items-center justify-between gap-4 shadow-sm">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.push('/viewer')}
+          <button onClick={() => router.push(backTarget)}
             className="text-gray-400 hover:text-gray-700 transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />

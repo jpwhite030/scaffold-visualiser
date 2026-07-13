@@ -3,11 +3,15 @@
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BuildingData } from '@/lib/buildingTypes';
+import { SiteData } from '@/lib/siteTypes';
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
+type Mode = 'building' | 'site';
+
 export default function UploadPage() {
   const router = useRouter();
+  const [mode, setMode] = useState<Mode>('building');
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +46,7 @@ export default function UploadPage() {
         formData.append('file', file);
 
         const [res, dataUrl] = await Promise.all([
-          fetch('/api/analyze', { method: 'POST', body: formData }),
+          fetch(mode === 'site' ? '/api/analyze-site' : '/api/analyze', { method: 'POST', body: formData }),
           dataUrlPromise,
         ]);
 
@@ -55,16 +59,23 @@ export default function UploadPage() {
           return;
         }
 
-        const data = (await res.json()) as BuildingData;
-        sessionStorage.setItem('buildingData', JSON.stringify(data));
-        try { sessionStorage.setItem('imageDataUrl', dataUrl); } catch { /* file too large for sessionStorage — thumbnail won't show */ }
-        router.push('/review');
+        if (mode === 'site') {
+          const data = (await res.json()) as SiteData;
+          sessionStorage.setItem('siteData', JSON.stringify(data));
+          try { sessionStorage.setItem('imageDataUrl', dataUrl); } catch { /* file too large for sessionStorage — thumbnail won't show */ }
+          router.push('/site-review');
+        } else {
+          const data = (await res.json()) as BuildingData;
+          sessionStorage.setItem('buildingData', JSON.stringify(data));
+          try { sessionStorage.setItem('imageDataUrl', dataUrl); } catch { /* file too large for sessionStorage — thumbnail won't show */ }
+          router.push('/review');
+        }
       } catch {
         setError('Network error. Please check your connection and try again.');
         setLoading(false);
       }
     },
-    [router]
+    [router, mode]
   );
 
   const onDrop = useCallback(
@@ -88,9 +99,17 @@ export default function UploadPage() {
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-xl">
-        <div className="text-center mb-10">
+        <div className="text-center mb-8">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="Scaffold Visualiser" className="mx-auto w-full max-w-md" />
+        </div>
+
+        {/* Mode selector — one building vs the whole site */}
+        <div className="flex justify-center mb-6">
+          <div className="inline-flex rounded-full border border-gray-300 bg-white p-1">
+            <ModeBtn label="Building plan" active={mode === 'building'} onClick={() => { setMode('building'); setError(null); }} disabled={loading} />
+            <ModeBtn label="Site plan" active={mode === 'site'} onClick={() => { setMode('site'); setError(null); }} disabled={loading} />
+          </div>
         </div>
 
         <label
@@ -103,8 +122,12 @@ export default function UploadPage() {
           {loading ? (
             <div className="flex flex-col items-center gap-3">
               <div className="w-10 h-10 border-4 border-orange-400 border-t-transparent rounded-full animate-spin" />
-              <p className="text-gray-600 font-medium">Analysing plans with AI…</p>
-              <p className="text-gray-400 text-sm">Reading dimensions and tracing footprint — up to 30 seconds</p>
+              <p className="text-gray-600 font-medium">Analysing {mode === 'site' ? 'site plan' : 'plans'} with AI…</p>
+              <p className="text-gray-400 text-sm">
+                {mode === 'site'
+                  ? 'Reading the lot boundary, buildings and driveway — up to 60 seconds'
+                  : 'Reading dimensions and tracing footprint — up to 30 seconds'}
+              </p>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-3 text-center px-4">
@@ -113,12 +136,18 @@ export default function UploadPage() {
                   d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z" />
               </svg>
               <div>
-                <p className="text-gray-700 font-semibold">Drop your building plans here</p>
+                <p className="text-gray-700 font-semibold">
+                  {mode === 'site' ? 'Drop your site plan here' : 'Drop your building plans here'}
+                </p>
                 <p className="text-gray-400 text-sm mt-1">or click to browse</p>
               </div>
               <p className="text-gray-400 text-xs">PDF, JPG, PNG, WebP — max 10 MB</p>
               <p className="text-gray-400 text-xs mt-1 max-w-xs">
-                Best results: upload the full PDF plan set including floor plan <span className="font-semibold">and</span> elevation drawings — AI reads heights from the elevations. Floor plan only = default heights (2.7 m).
+                {mode === 'site' ? (
+                  <>Best results: a site plan showing the whole block — lot boundary with dimensions, all buildings, and the driveway. Heights default to single storey (editable next).</>
+                ) : (
+                  <>Best results: upload the full PDF plan set including floor plan <span className="font-semibold">and</span> elevation drawings — AI reads heights from the elevations. Floor plan only = default heights (2.7 m).</>
+                )}
               </p>
             </div>
           )}
@@ -138,18 +167,53 @@ export default function UploadPage() {
         )}
 
         <p className="text-center mt-6 text-sm text-gray-400">
-          No plans yet?{' '}
-          <button
-            className="text-orange-500 hover:underline font-medium"
-            onClick={() => {
-              sessionStorage.removeItem('analyzedBuilding');
-              router.push('/review');
-            }}
-          >
-            Enter dimensions manually
-          </button>
+          {mode === 'site' ? (
+            <>
+              No site plan?{' '}
+              <button
+                className="text-orange-500 hover:underline font-medium"
+                onClick={() => {
+                  sessionStorage.removeItem('siteData');
+                  sessionStorage.removeItem('imageDataUrl');
+                  router.push('/site-review');
+                }}
+              >
+                Start with a blank site
+              </button>
+            </>
+          ) : (
+            <>
+              No plans yet?{' '}
+              <button
+                className="text-orange-500 hover:underline font-medium"
+                onClick={() => {
+                  sessionStorage.removeItem('analyzedBuilding');
+                  router.push('/review');
+                }}
+              >
+                Enter dimensions manually
+              </button>
+            </>
+          )}
         </p>
       </div>
     </main>
+  );
+}
+
+function ModeBtn({ label, active, onClick, disabled }: {
+  label: string; active: boolean; onClick: () => void; disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`text-sm font-semibold px-5 py-2 rounded-full transition-colors ${
+        active ? 'bg-orange-500 text-white shadow' : 'text-gray-500 hover:text-gray-800'
+      } disabled:opacity-60`}
+    >
+      {label}
+    </button>
   );
 }

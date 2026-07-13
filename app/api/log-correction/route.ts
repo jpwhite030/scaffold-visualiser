@@ -18,6 +18,10 @@ interface CorrectionPayload {
   worldW?: number;
   worldD?: number;
   wasEdited?: boolean;
+  // Site-visualiser corrections: whole-site JSON instead of a single footprint
+  mode?: 'building' | 'site';
+  originalSite?: unknown;
+  correctedSite?: unknown;
 }
 
 export async function POST(request: NextRequest) {
@@ -35,11 +39,14 @@ export async function POST(request: NextRequest) {
 
     const record = {
       capturedAt: new Date().toISOString(),
+      mode: body.mode ?? 'building',
       worldW: body.worldW ?? null,
       worldD: body.worldD ?? null,
       wasEdited: body.wasEdited ?? null,
       original: body.original ?? null,
       corrected: body.corrected ?? null,
+      originalSite: body.originalSite ?? null,
+      correctedSite: body.correctedSite ?? null,
       imageDataUrl: body.imageDataUrl ?? null,
     };
 

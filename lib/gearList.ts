@@ -157,6 +157,33 @@ function nearPt(pts: [number, number][], x: number, z: number): boolean {
   return pts.some(s => Math.hypot(s[0] - x, s[1] - z) < 0.05);
 }
 
+/** Combine per-building gear lists into one site total. */
+export function sumGearLists(lists: GearList[]): GearList {
+  const total: GearList = {
+    standards:  {},
+    ledgers:    {},
+    transoms:   0,
+    braces:     0,
+    deckBoards: {},
+    guardrails: 0,
+    toeBoards:  0,
+    basePlates: 0,
+    screwJacks: 0,
+  };
+  for (const gl of lists) {
+    for (const [k, v] of Object.entries(gl.standards))  addTo(total.standards, k, v);
+    for (const [k, v] of Object.entries(gl.ledgers))    addTo(total.ledgers, k, v);
+    for (const [k, v] of Object.entries(gl.deckBoards)) addTo(total.deckBoards, k, v);
+    total.transoms   += gl.transoms;
+    total.braces     += gl.braces;
+    total.guardrails += gl.guardrails;
+    total.toeBoards  += gl.toeBoards;
+    total.basePlates += gl.basePlates;
+    total.screwJacks += gl.screwJacks;
+  }
+  return total;
+}
+
 // ── main ──────────────────────────────────────────────────────────────────────
 
 export function computeGearList(data: BuildingData): GearList {
