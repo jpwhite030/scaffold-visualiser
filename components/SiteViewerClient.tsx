@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Line } from '@react-three/drei';
 import { useRouter } from 'next/navigation';
@@ -12,52 +11,7 @@ import HouseModel from './HouseModel';
 import ScaffoldModel from './ScaffoldModel';
 import SceneChrome, { ToggleBtn } from './SceneChrome';
 import GearListModal from './GearListModal';
-
-// Flat polygon lying on the ground (lot surface, driveways, paths, pool).
-// THREE.Shape lives in XY; rotating -90° about X maps shape (x, y) → world
-// (x, 0, -y), so feed it (x, -z) to land on the site's XZ coordinates.
-function FlatPolygon({ points, y, color, roughness = 0.95 }: {
-  points: [number, number][];
-  y: number;
-  color: string;
-  roughness?: number;
-}) {
-  const geo = useMemo(() => {
-    const shape = new THREE.Shape();
-    points.forEach(([x, z], i) => {
-      if (i === 0) shape.moveTo(x, -z);
-      else shape.lineTo(x, -z);
-    });
-    shape.closePath();
-    return new THREE.ShapeGeometry(shape);
-  }, [points]);
-  return (
-    <mesh geometry={geo} rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]} receiveShadow>
-      <meshStandardMaterial color={color} roughness={roughness} metalness={0} side={THREE.DoubleSide} />
-    </mesh>
-  );
-}
-
-const SURFACE_COLORS: Record<string, { color: string; roughness: number }> = {
-  driveway: { color: '#8d939c', roughness: 0.9 },
-  path:     { color: '#a3a8af', roughness: 0.9 },
-  pool:     { color: '#2f7fd4', roughness: 0.15 },
-};
-
-function Tree({ at }: { at: [number, number] }) {
-  return (
-    <group position={[at[0], 0, at[1]]}>
-      <mesh position={[0, 0.8, 0]} castShadow>
-        <cylinderGeometry args={[0.1, 0.14, 1.6, 8]} />
-        <meshStandardMaterial color="#6b4f2e" roughness={0.9} />
-      </mesh>
-      <mesh position={[0, 2.6, 0]} castShadow>
-        <coneGeometry args={[1.2, 2.6, 10]} />
-        <meshStandardMaterial color="#3e6b35" roughness={0.85} />
-      </mesh>
-    </group>
-  );
-}
+import { GroundPoly, PalingFence, StreetScene, Tree, findStreetEdge, useSiteMaterials } from './siteScenery';
 
 export default function SiteViewerClient({ site: initialSite }: { site: SiteData }) {
   const router = useRouter();
@@ -104,6 +58,12 @@ export default function SiteViewerClient({ site: initialSite }: { site: SiteData
       return next;
     });
   };
+
+  const streetEdge = useMemo(() => findStreetEdge(site.boundary, site.surfaces), [site.boundary, site.surfaces]);
+  const fenceOpenings = useMemo(
+    () => site.surfaces.filter(s => s.kind !== 'pool').map(s => s.polygon),
+    [site.surfaces]
+  );
 
   const boundaryLine = useMemo(() => {
     const pts = site.boundary.map(([x, z]) => [x, 0.05, z] as [number, number, number]);
@@ -198,24 +158,7 @@ export default function SiteViewerClient({ site: initialSite }: { site: SiteData
       <Canvas shadows camera={{ position: [cameraDistance, cameraHeight, cameraDistance], fov: 45 }}
         gl={{ antialias: true, toneMappingExposure: 1.05 }}>
         <SceneChrome groundSpread={groundSpread} shadowFar={Math.max(maxEave, 3) + 6} />
-
-        {/* Lot surface — sits just above the dark ground so the block reads as grass */}
-        <FlatPolygon points={site.boundary} y={0.015} color="#4a6b3f" roughness={0.98} />
-
-        {/* Boundary line + corner posts */}
-        <Line points={boundaryLine} color="#f5f7fa" lineWidth={2} transparent opacity={0.85} />
-        {site.boundary.map(([x, z], i) => (
-          <mesh key={i} position={[x, 0.45, z]} castShadow>
-            <boxGeometry args={[0.09, 0.9, 0.09]} />
-            <meshStandardMaterial color="#d7dbe0" roughness={0.6} metalness={0.3} />
-          </mesh>
-        ))}
-
-        {/* Driveways / paths / pool */}
-        {site.surfaces.map(s => {
-          const style = SURFACE_COLORS[s.kind] ?? SURFACE_COLORS.driveway;
-          return <FlatPolygon key={s.id} points={s.polygon} y={0.035} color={style.color} roughness={style.roughness} />;
-        })}
+        <SiteScenery site={site} streetEdge={streetEdge} fenceOpenings={fenceOpenings} boundaryLine={boundaryLine} />
 
         {/* Buildings — HouseModel/ScaffoldModel untouched, wrapped in a local frame */}
         {frames.map(({ building, center, angleRad, localData }) => (
@@ -225,10 +168,47 @@ export default function SiteViewerClient({ site: initialSite }: { site: SiteData
           </group>
         ))}
 
-        {site.trees?.map((t, i) => <Tree key={i} at={t} />)}
-
         <OrbitControls makeDefault target={[0, 2, 0]} minDistance={5} maxDistance={300} maxPolarAngle={Math.PI / 2 - 0.02} />
       </Canvas>
     </div>
+  );
+}
+
+// Ground, fence, street and trees — split out so useSiteMaterials runs inside
+// the Canvas tree (it builds textures/materials once and disposes on unmount).
+function SiteScenery({ site, streetEdge, fenceOpenings, boundaryLine }: {
+  site: SiteData;
+  streetEdge: number;
+  fenceOpenings: [number, number][][];
+  boundaryLine: [number, number, number][];
+}) {
+  const mats = useSiteMaterials();
+  return (
+    <group>
+      {/* Grass lot sitting just above the dark ground plane */}
+      <GroundPoly points={site.boundary} y={0.015} material={mats.grassLot} />
+
+      {/* Legal boundary marked as a thin surveyor's line (fence sits on it) */}
+      <Line points={boundaryLine} color="#f5f7fa" lineWidth={1} transparent opacity={0.35} />
+
+      {/* Timber paling fence — open along the street edge and at the driveway */}
+      <PalingFence boundary={site.boundary} streetEdge={streetEdge} openings={fenceOpenings} />
+
+      {/* Street along the front: verge, footpath, kerb, asphalt + centreline */}
+      <StreetScene boundary={site.boundary} edgeIndex={streetEdge}
+        grassMat={mats.grassStrip} concreteMat={mats.concreteStrip} asphaltMat={mats.asphalt} />
+
+      {/* Driveways / paths / pool */}
+      {site.surfaces.map(s => (
+        <GroundPoly
+          key={s.id}
+          points={s.polygon}
+          y={s.kind === 'pool' ? 0.045 : 0.035}
+          material={s.kind === 'pool' ? mats.pool : mats.concreteLot}
+        />
+      ))}
+
+      {site.trees?.map((t, i) => <Tree key={i} at={t} seed={i + 1} />)}
+    </group>
   );
 }

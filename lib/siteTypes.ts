@@ -100,6 +100,7 @@ export const DEFAULT_SITE: SiteData = {
   surfaces: [
     { id: siteUid(), kind: 'driveway', polygon: [[4, -16], [7, -16], [7, 6], [4, 6]] },
   ],
+  trees: [[-7, 13], [8, -12], [-8, -13]],
 };
 
 /**
