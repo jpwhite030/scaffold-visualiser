@@ -1,36 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Scaffold Visualiser
 
-## Getting Started
+Upload a building plan, get a true-to-erection **Kwikstage** scaffold model, a
+counted gear list, a client-ready quote — and every job pinned on a live map.
 
-First, run the development server:
+Built for [Skelscaff](mailto:jack@skelscaff.com.au) on Next.js + React Three Fiber.
+
+## What it does
+
+- **Plan → 3D** — upload a floor plan/elevations (PDF or image); AI traces the
+  footprint and heights, editable on the review page. Or enter dimensions manually.
+- **Kwikstage scaffold, modelled like it's erected** — 0.7/1.2/1.8/2.4 m bays on
+  real ledger sizes, 2 m lifts, star rosettes every 500 mm, boarded lifts with
+  toe boards, bracing, wall ties, a zig-zag stair tower (or ladder), roof-catch
+  or edge protection on top.
+- **Kit view** — one toggle recolours every tube and board by stock length
+  (2.4 m yellow · 1.8 m pink · 1.2 m blue · 0.76 m green · braces teal · rails
+  violet), with a legend counted from the same gear-list maths. What's on
+  screen is what goes on the truck.
+- **Gear list & quote** — full Kwikstage count (standards, ledgers, transoms,
+  boards, rails, jacks) and an editable, printable quote with GST.
+- **Live job map** (`/map`) — every job pinned at its address on OpenStreetMap,
+  coloured by status (Order / Booked In / Live / Off-Hired), with a project
+  sidebar, filters, add-a-job (auto-geocoded), and "Open Project" straight into
+  the saved 3D model. Quotes can be saved to the map with one click.
+- **Site mode** — trace a whole block (multiple buildings, driveway, trees) and
+  scaffold any subset of the buildings.
+
+## Run it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Production build: `npm run build && npm start`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Environment (all optional in local dev):
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `ANTHROPIC_API_KEY` — plan analysis
+- `BLOB_READ_WRITE_TOKEN` — Vercel Blob storage for corrections + saved projects
+  (local dev stores projects in `data/projects.json`)
+- `AUTH_SECRET` / login gate vars — production login
 
-## Learn More
+## Key paths
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `components/ScaffoldModel.tsx` — parametric Kwikstage generator (+ kit view)
+- `lib/gearList.ts` — stock-length gear counting
+- `app/map/` + `components/MapClient.tsx` — live job map
+- `app/api/projects` + `lib/projectStore.ts` — job storage (file dev / blob prod)
+- `app/api/geocode` — server-side Nominatim proxy

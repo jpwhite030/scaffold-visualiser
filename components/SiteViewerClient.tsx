@@ -19,6 +19,7 @@ export default function SiteViewerClient({ site: initialSite }: { site: SiteData
   const [showHouses, setShowHouses] = useState(true);
   const [showScaffold, setShowScaffold] = useState(true);
   const [showGearList, setShowGearList] = useState(false);
+  const [kitView, setKitView] = useState(false);
 
   const bounds = footprintBounds(site.boundary);
   const lotW = bounds.maxX - bounds.minX;
@@ -120,6 +121,7 @@ export default function SiteViewerClient({ site: initialSite }: { site: SiteData
         <div className="flex gap-2">
           <ToggleBtn label="Houses" active={showHouses} onClick={() => setShowHouses(v => !v)} />
           <ToggleBtn label="Scaffold" active={showScaffold} onClick={() => setShowScaffold(v => !v)} />
+          <ToggleBtn label="Kit view" active={kitView} onClick={() => setKitView(v => !v)} />
           <button
             onClick={() => setShowGearList(true)}
             className="text-sm px-4 py-2 rounded-lg font-medium transition-colors bg-black/50 text-white hover:bg-black/70 shadow"
@@ -164,7 +166,7 @@ export default function SiteViewerClient({ site: initialSite }: { site: SiteData
         {frames.map(({ building, center, angleRad, localData }) => (
           <group key={building.id} position={[center[0], 0, center[1]]} rotation={[0, angleRad, 0]}>
             {showHouses && <HouseModel data={localData} />}
-            {showScaffold && building.scaffold_enabled && <ScaffoldModel data={localData} />}
+            {showScaffold && building.scaffold_enabled && <ScaffoldModel data={localData} kitView={kitView} />}
           </group>
         ))}
 

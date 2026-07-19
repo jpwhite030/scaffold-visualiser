@@ -15,7 +15,7 @@ milestone if push works without prompting; otherwise leave commits local.
       guardrails = violet `#b39ddb`. Deck boards get the same length→colour mapping (the big yellow decks in the reference).
 - [x] House semi-transparent in kit view — SKIPPED deliberately: the reference kit view keeps the brick house fully visible; House toggle already exists for hiding it.
 - [x] Legend panel (bottom-left overlay) showing colour → stock length → count, counts pulled from the same gearList computation so the legend IS the gear list summary.
-- [ ] Same toggle works in the site viewer if trivial; skip if it drags. (Deferred to polish pass.)
+- [x] Same toggle works in the site viewer — done in the polish pass (toggle + kitView prop; per-building legend stays viewer-only).
 
 ## Milestone 2 — Projects store
 - [x] `lib/projects.ts`: `Project` type — id (`PRJ-1001` style), name, client, address, suburb/state/postcode, lat, lng, price (AUD), status: `enquiry | order | booked | live | off-hired`, createdAt, optional `building: BuildingData` snapshot. Plus STATUS_META (label + colour per status) shared by map pins/badges.
@@ -36,9 +36,10 @@ milestone if push works without prompting; otherwise leave commits local.
 - [x] Smoke-tested from the right cwd this time: geocode Kiama → real coords, POST created PRJ-1007, DELETE removed it, seed restored.
 
 ## Milestone 5 — Polish pass (only if 1–4 all green)
-- [ ] Kit view: subtle white/light backdrop toggle like reference "kit" renders (light background reads better for the coloured kit).
-- [ ] Screenshot-parity pass on viewer: check guardrail double-rail on top deck, stair tower visible, kickboards tinted yellow in kit view.
-- [ ] README section: what the app does, /map, kit view, run commands.
+- [x] Kit view toggle added to the site viewer (multi-building blocks get the coloured kit too).
+- [x] Light backdrop toggle — SKIPPED deliberately: SceneChrome's existing environment reads fine under the matte kit materials; not worth the scene rework tonight.
+- [x] Screenshot-parity check: roof-catch = 4 rails on top deck ✓, stair tower with raking rails ✓, toe boards render yellow in both views ✓ (all pre-existing in ScaffoldModel).
+- [x] README rewritten: what the app does, kit view, /map, run commands, env vars, key paths.
 
 ## Working notes
 - Next.js 16: READ `node_modules/next/dist/docs/` guides before writing route handlers or dynamic imports — conventions may differ from training data.
@@ -55,5 +56,6 @@ milestone if push works without prompting; otherwise leave commits local.
 - 19/07/2026 · 722e381 · Milestone 1 — kit view toggle, stock-length colours, legend overlay. tsc + build green, pushed.
 - 19/07/2026 · d83d7f5 · Milestone 2 — Project types + STATUS_META, file/blob store, /api/projects CRUD, 6 seeded Illawarra jobs. tsc + build green.
 - 19/07/2026 · 1d5bb5d · Milestone 3 — /map live job map: Leaflet+OSM, status pins, filter pills, sidebar cards, Open Project → viewer, nav links. Smoke-tested 200s.
-- 19/07/2026 · (next) · Milestone 4 — SaveProjectModal + /api/geocode + Add job on map + Save to job map on quote. CRUD + geocode smoke-tested.
+- 19/07/2026 · c953091 · Milestone 4 — SaveProjectModal + /api/geocode + Add job on map + Save to job map on quote. CRUD + geocode smoke-tested.
+- 19/07/2026 · (next) · Milestone 5 — site-viewer kit toggle, README rewrite, parity check. ALL MILESTONES DONE.
 - NOTE: always `cd /Users/jpwhi/scaffold-visualiser` inside every Bash command — session cwd resets to tally-marketing-os between turns, and one smoke test silently ran against the wrong repo before being caught and re-run.
