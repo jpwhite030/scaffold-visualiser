@@ -1,8 +1,41 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { BuildingData, footprintBounds } from '@/lib/buildingTypes';
+
+// Procedural running-bond brickwork, 1 m × 1 m per canvas tile: ~86 mm courses,
+// ~240 mm bricks with mortar joints and per-brick colour jitter. Walls are
+// UV-mapped in metres, so RepeatWrapping keeps bricks true to scale on every
+// wall length. Client-only (canvas), same pattern as the galvanised spangle map.
+function makeBrickTexture(): THREE.CanvasTexture {
+  const W = 256, Hpx = 256;
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = Hpx;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#cfc8bb';                 // mortar
+  ctx.fillRect(0, 0, W, Hpx);
+  const courseH = Hpx / 11.5;                // ≈86 mm brick courses
+  const brickW = W / 4.2;                    // ≈240 mm brick + joint
+  const joint = 2.4;
+  let row = 0;
+  for (let y = 0; y < Hpx; y += courseH, row++) {
+    const offset = row % 2 === 0 ? 0 : brickW / 2;
+    for (let x = -brickW; x < W + brickW; x += brickW) {
+      const r = 152 + Math.floor(Math.random() * 42);
+      const g = 86 + Math.floor(Math.random() * 24);
+      const b = 64 + Math.floor(Math.random() * 18);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x + offset + joint / 2, y + joint / 2, brickW - joint, courseH - joint);
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
 
 const EAVE_OUT = 0;        // no overhang — keeps roof inside scaffold clearance
 const FASCIA_H = 0.14;
@@ -46,21 +79,28 @@ export default function HouseModel({ data }: { data: BuildingData }) {
   const n = footprint.length;
 
   const wallGeo = useMemo(() => {
-    const pos: number[] = [], idx: number[] = [];
+    const pos: number[] = [], uv: number[] = [], idx: number[] = [];
     let vi = 0;
     for (let i = 0; i < n; i++) {
       const [x1, z1] = footprint[i];
       const [x2, z2] = footprint[(i + 1) % n];
+      const len = Math.hypot(x2 - x1, z2 - z1);
       pos.push(x1, 0, z1, x2, 0, z2, x2, H, z2, x1, H, z1);
+      // UVs in metres so the 1 m brick tile repeats at true scale
+      uv.push(0, 0, len, 0, len, H, 0, H);
       idx.push(vi, vi + 2, vi + 1, vi, vi + 3, vi + 2);
       vi += 4;
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uv), 2));
     geo.setIndex(idx);
     geo.computeVertexNormals();
     return geo;
   }, [footprint, H, n]);
+
+  const brickTex = useMemo(() => makeBrickTexture(), []);
+  useEffect(() => () => brickTex.dispose(), [brickTex]);
 
   const bounds = useMemo(() => footprintBounds(footprint), [footprint]);
   const { minX, maxX, minZ, maxZ } = bounds;
@@ -244,9 +284,9 @@ export default function HouseModel({ data }: { data: BuildingData }) {
 
   return (
     <group>
-      {/* Walls */}
+      {/* Walls — running-bond brickwork like the sales renders */}
       <mesh geometry={wallGeo} castShadow receiveShadow>
-        <meshStandardMaterial color="#f2e6d4" roughness={0.88} side={THREE.DoubleSide} />
+        <meshStandardMaterial map={brickTex} roughness={0.9} side={THREE.DoubleSide} />
       </mesh>
 
       {/* Flat roof cap */}
