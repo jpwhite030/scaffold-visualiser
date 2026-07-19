@@ -31,8 +31,9 @@ milestone if push works without prompting; otherwise leave commits local.
 - [x] Smoke-tested against `next start`: /map → 200, /api/projects returns the 6 seeds.
 
 ## Milestone 4 — Add-a-job flow
-- [ ] Small form (modal or `/map/new`): name, client, address fields, price, status. Geocode on submit via Nominatim (`https://nominatim.openstreetmap.org/search?format=json&q=...`, User-Agent header, one call per submit) with manual lat/lng override fields as fallback. Server-side route to avoid CORS/rate issues.
-- [ ] "Save as project" button on the quote page (`app/quote/page.tsx`) that captures the current BuildingData + gear list price into a new project → lands on map.
+- [x] SaveProjectModal (shared): name, client, address/suburb/state/postcode, price, status. Geocodes on save via /api/geocode (server-side Nominatim proxy, guarded, AU-bounded) with manual lat/lng fallback fields. "＋ Add job" button in the map sidebar → new pin selected on save.
+- [x] "Save to job map" button on the quote page toolbar — prefills client, address, quote total (inc GST) and attaches the BuildingData snapshot (building mode) so the job opens in the 3D viewer from the map.
+- [x] Smoke-tested from the right cwd this time: geocode Kiama → real coords, POST created PRJ-1007, DELETE removed it, seed restored.
 
 ## Milestone 5 — Polish pass (only if 1–4 all green)
 - [ ] Kit view: subtle white/light backdrop toggle like reference "kit" renders (light background reads better for the coloured kit).
@@ -53,4 +54,6 @@ milestone if push works without prompting; otherwise leave commits local.
 (append one line per completed milestone: date, commit hash, what)
 - 19/07/2026 · 722e381 · Milestone 1 — kit view toggle, stock-length colours, legend overlay. tsc + build green, pushed.
 - 19/07/2026 · d83d7f5 · Milestone 2 — Project types + STATUS_META, file/blob store, /api/projects CRUD, 6 seeded Illawarra jobs. tsc + build green.
-- 19/07/2026 · (next) · Milestone 3 — /map live job map: Leaflet+OSM, status pins, filter pills, sidebar cards, Open Project → viewer, nav links. Smoke-tested 200s.
+- 19/07/2026 · 1d5bb5d · Milestone 3 — /map live job map: Leaflet+OSM, status pins, filter pills, sidebar cards, Open Project → viewer, nav links. Smoke-tested 200s.
+- 19/07/2026 · (next) · Milestone 4 — SaveProjectModal + /api/geocode + Add job on map + Save to job map on quote. CRUD + geocode smoke-tested.
+- NOTE: always `cd /Users/jpwhi/scaffold-visualiser` inside every Bash command — session cwd resets to tally-marketing-os between turns, and one smoke test silently ran against the wrong repo before being caught and re-run.

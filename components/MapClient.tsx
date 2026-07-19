@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import L from 'leaflet';
 import { Project, ProjectStatus, STATUS_META, fullAddress, formatPrice } from '@/lib/projects';
+import SaveProjectModal from './SaveProjectModal';
 
 // Live job map — every project pinned at its address, coloured by status, with
 // the project list down the right-hand side (mirrors the layout scaffolding
@@ -31,6 +32,7 @@ export default function MapClient() {
   const [filter, setFilter] = useState<Filter>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
 
   const visible = useMemo(
     () => (filter === 'all' ? projects : projects.filter(p => p.status === filter)),
@@ -145,9 +147,17 @@ export default function MapClient() {
 
       {/* ── Project list ── */}
       <aside className="w-[340px] shrink-0 h-full overflow-y-auto bg-white border-l border-gray-200">
-        <div className="px-4 py-4 border-b border-gray-200 sticky top-0 bg-white z-10">
-          <h1 className="text-base font-bold text-gray-800">Projects</h1>
-          <p className="text-xs text-gray-400 mt-0.5">Live map of every job on the books</p>
+        <div className="px-4 py-4 border-b border-gray-200 sticky top-0 bg-white z-10 flex items-center justify-between gap-2">
+          <div>
+            <h1 className="text-base font-bold text-gray-800">Projects</h1>
+            <p className="text-xs text-gray-400 mt-0.5">Live map of every job on the books</p>
+          </div>
+          <button
+            onClick={() => setShowAdd(true)}
+            className="bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-3 py-2 rounded-lg shrink-0"
+          >
+            ＋ Add job
+          </button>
         </div>
 
         {loadError && (
@@ -201,6 +211,20 @@ export default function MapClient() {
           );
         })}
       </aside>
+
+      <SaveProjectModal
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        onSaved={p => {
+          setShowAdd(false);
+          setProjects(prev => {
+            const i = prev.findIndex(x => x.id === p.id);
+            return i >= 0 ? prev.map(x => (x.id === p.id ? p : x)) : [...prev, p];
+          });
+          setFilter('all');
+          setSelectedId(p.id);
+        }}
+      />
     </div>
   );
 }
