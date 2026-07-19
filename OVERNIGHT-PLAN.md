@@ -50,3 +50,4 @@ milestone if push works without prompting; otherwise leave commits local.
 
 ## Done log
 (append one line per completed milestone: date, commit hash, what)
+- 19/07/2026 · 722e381 · Milestone 1 — kit view toggle, stock-length colours, legend overlay. tsc + build green, pushed.
