@@ -23,8 +23,8 @@ export default function ViewerClient({ data }: { data: BuildingData }) {
   const diagH = Math.sqrt((bounds.maxX - bounds.minX) ** 2 + (bounds.maxZ - bounds.minZ) ** 2);
   // Contact-shadow plane sized to the footprint plus the scaffold's standoff/margin.
   const groundSpread = Math.max(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ) + 8;
-  const cameraDistance = diagH * 1.8;
-  const cameraHeight = cameraDistance * 0.55;
+  const cameraDistance = diagH * 1.35;
+  const cameraHeight = cameraDistance * 0.5;
   const targetHeight = data.eave_height_m / 2;
 
   const DimPill = ({ label, value }: { label: string; value: string }) => (

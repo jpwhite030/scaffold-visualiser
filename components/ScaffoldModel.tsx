@@ -12,9 +12,9 @@ const BAY    = 2.4;
 const LIFT   = 2.0;
 
 const TUBE_R  = 0.024;
-const RAIL_R  = 0.018;
+const RAIL_R  = 0.017;
 const BRACE_R = 0.019;
-const SEG     = 10;
+const SEG     = 14;
 
 const RAIL_LO = 0.5;
 const RAIL_HI = 1.0;
@@ -24,10 +24,10 @@ const KB_H = 0.15;   // 150 mm standard toe-board height
 const KB_T = 0.025;  // board thickness
 
 
-// ── Colours — muted Kwikstage palette ────────────────────────────────────────
-const KS_TUBE    = '#607898';   // muted steel-blue — the Kwikstage body colour
-const KS_ROSETTE = '#8aaac8';   // slightly lighter — star rosette plates stand out
-const KS_BOARD   = '#8c8c8c';   // perforated steel boards
+// ── Colours — realistic galvanised Kwikstage palette ─────────────────────────
+const KS_TUBE    = '#c6cbd2';   // light galvanised silver — hot-dip zinc finish
+const KS_PRESS   = '#a9afb8';   // V-pressings/wedge heads — slightly darker forged steel
+const KS_BOARD   = '#d3c199';   // timber/LVL scaffold boards — pale sanded pine
 
 // ── Kit view — every member coloured by its Kwikstage stock length ───────────
 // Matches the gear-list categories exactly, so the on-screen kit IS the load list.
@@ -190,20 +190,24 @@ function TubeMesh({ t, mat }: { t: Tube; mat: THREE.Material }) {
   );
 }
 
-// Kwikstage star rosette — octagonal plate + 4 blade tabs at 45° intervals
-function RosetteNode({ x, y, z, mat }: RosettePos & { mat: THREE.Material }) {
+// Kwikstage V-pressing — a compact forged collar with four V wedge cups at 90°
+// spacings, pressed onto the standard every 500 mm. Far subtler than a ringlock
+// rosette: from a distance it reads as a small nub on the tube, which is what
+// the real thing looks like.
+function VPressingNode({ x, y, z, mat }: RosettePos & { mat: THREE.Material }) {
   return (
     <group position={[x, y, z]}>
-      {/* Octagonal base plate */}
+      {/* Pressed collar wrapping the standard */}
       <mesh material={mat}>
-        <cylinderGeometry args={[0.046, 0.046, 0.011, 8]} />
+        <cylinderGeometry args={[0.029, 0.029, 0.03, 10]} />
       </mesh>
-      {/* 8 blade slots radiating outward — Kwikstage star */}
-      {Array.from({ length: 8 }, (_, i) => {
-        const a = (i * Math.PI) / 4;
+      {/* 4 V-cups facing outward, tipped slightly down like the pressing */}
+      {Array.from({ length: 4 }, (_, i) => {
+        const a = (i * Math.PI) / 2;
         return (
-          <mesh key={i} position={[Math.cos(a) * 0.052, 0, Math.sin(a) * 0.052]} rotation={[0, a, 0]} material={mat}>
-            <boxGeometry args={[0.018, 0.011, 0.014]} />
+          <mesh key={i} position={[Math.cos(a) * 0.036, -0.003, Math.sin(a) * 0.036]}
+            rotation={[0.25, -a, 0]} material={mat}>
+            <boxGeometry args={[0.019, 0.032, 0.013]} />
           </mesh>
         );
       })}
@@ -762,12 +766,12 @@ export default function ScaffoldModel({ data, kitView = false }: { data: Buildin
     return {
       // Standards / ledgers / transoms / rails / bracing.
       tube: steel(KS_TUBE),
-      // Rosette stars — brighter, crisper galvanised finish.
-      rosette: steel(KS_ROSETTE, { roughness: 0.26, clearcoat: 0.45, clearcoatRoughness: 0.4, envMapIntensity: 1.3 }),
-      // Perforated steel deck boards — galvanised, less mirror-like than the tubes.
-      board: steel(KS_BOARD, { metalness: 0.7, roughness: 0.5, clearcoat: 0.2, clearcoatRoughness: 0.6, envMapIntensity: 1.0 }),
-      // Painted timber/steel toe boards — matte, hardly reflective.
-      toe: new THREE.MeshStandardMaterial({ color: '#caa24a', metalness: 0.2, roughness: 0.7 }),
+      // V-pressings + forged wedge heads — darker, matter forged steel.
+      press: steel(KS_PRESS, { roughness: 0.42, clearcoat: 0.2, clearcoatRoughness: 0.5, envMapIntensity: 1.0 }),
+      // Timber/LVL scaffold boards — matte sanded pine, zero metalness.
+      board: new THREE.MeshStandardMaterial({ color: KS_BOARD, metalness: 0, roughness: 0.72 }),
+      // Painted safety-yellow toe boards — matte, hardly reflective.
+      toe: new THREE.MeshStandardMaterial({ color: '#e7c62f', metalness: 0.1, roughness: 0.6 }),
       basePlate: new THREE.MeshStandardMaterial({ color: '#777', metalness: 0.55, roughness: 0.45 }),
       // Threaded jack / nut — galvanised steel like the tubes.
       jack: steel('#8a8a8a', { metalness: 0.85, roughness: 0.3, clearcoat: 0.3, envMapIntensity: 1.1 }),
@@ -815,14 +819,14 @@ export default function ScaffoldModel({ data, kitView = false }: { data: Buildin
       {/* All steel tubes — standards, ledgers, transoms, rails, bracing */}
       {tubes.map((t, i) => <TubeMesh key={i} t={t} mat={kitView ? kitTubeMat(t) : mats.tube} />)}
 
-      {/* Kwikstage star rosettes at every 500 mm on each standard */}
-      {rosettes.map((r, i) => <RosetteNode key={`r${i}`} {...r} mat={kitView ? mats.kitStd : mats.rosette} />)}
+      {/* Kwikstage V-pressings at every 500 mm on each standard */}
+      {rosettes.map((r, i) => <VPressingNode key={`r${i}`} {...r} mat={kitView ? mats.kitStd : mats.press} />)}
 
-      {/* Forged ledger/transom heads clamped on the rosettes (instanced) */}
-      <InstancedBoxes items={connectors} size={[0.06, 0.092, 0.052]} mat={kitView ? mats.kitStd : mats.tube} />
+      {/* Forged wedge heads where ledgers/transoms clamp the pressings (instanced) */}
+      <InstancedBoxes items={connectors} size={[0.042, 0.072, 0.038]} mat={kitView ? mats.kitStd : mats.press} />
 
-      {/* Steel-batten end hooks draped over the transoms (instanced) */}
-      <InstancedBoxes items={boardHooks} size={[0.02, 0.07, 0.234]} mat={kitView ? mats.kitStd : mats.board} />
+      {/* Galvanised end bands on the board ends, draped over the transoms (instanced) */}
+      <InstancedBoxes items={boardHooks} size={[0.016, 0.055, 0.226]} mat={kitView ? mats.kitStd : mats.tube} />
 
       {/* Flat perforated steel boards — kit view colours each by stock length */}
       {boards.map((b, i) => (
