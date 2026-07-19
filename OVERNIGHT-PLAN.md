@@ -18,9 +18,9 @@ milestone if push works without prompting; otherwise leave commits local.
 - [ ] Same toggle works in the site viewer if trivial; skip if it drags. (Deferred to polish pass.)
 
 ## Milestone 2 — Projects store
-- [ ] `lib/projects.ts`: `Project` type — id (`PRJ-1001` style), name, client, address, suburb/state/postcode, lat, lng, price (AUD), status: `enquiry | order | booked | live | off-hired`, createdAt, optional `building: BuildingData` snapshot.
-- [ ] Storage: `app/api/projects/route.ts` (GET list, POST create/update, DELETE). Local dev: JSON file at `data/projects.json` (gitignore the folder? No — commit seed data, it's demo). Production note: @vercel/blob is already a dep — use it only if straightforward, otherwise file-based is fine for now.
-- [ ] Seed `data/projects.json` with 6 realistic Illawarra/Wollongong-area jobs (Wollongong, Thirroul, Shellharbour, Kiama, Dapto, Corrimal) with real-looking street addresses, hardcoded lat/lng (no geocoding call needed for seeds), mixed statuses, realistic scaffold prices ($4k–$55k).
+- [x] `lib/projects.ts`: `Project` type — id (`PRJ-1001` style), name, client, address, suburb/state/postcode, lat, lng, price (AUD), status: `enquiry | order | booked | live | off-hired`, createdAt, optional `building: BuildingData` snapshot. Plus STATUS_META (label + colour per status) shared by map pins/badges.
+- [x] Storage: `app/api/projects/route.ts` (GET list, POST create/update, DELETE) with the repo's guard(). Store in `lib/projectStore.ts`: local dev reads/writes `data/projects.json`; on Vercel (BLOB_READ_WRITE_TOKEN) a fixed-key JSON blob with the committed file as first-run seed.
+- [x] Seed `data/projects.json` with 6 realistic Illawarra jobs (Dapto, Thirroul, Shellharbour, Kiama, Keiraville, Corrimal), hardcoded lat/lng, mixed statuses, prices $4.3k–$18.4k.
 
 ## Milestone 3 — Live map page (`/map`)
 - [ ] Leaflet via CDN-free npm install (`leaflet`, no react-leaflet needed if a small wrapper is simpler with React 19). OSM tiles (no API key). Dynamic import, `ssr: false`.
@@ -51,3 +51,4 @@ milestone if push works without prompting; otherwise leave commits local.
 ## Done log
 (append one line per completed milestone: date, commit hash, what)
 - 19/07/2026 · 722e381 · Milestone 1 — kit view toggle, stock-length colours, legend overlay. tsc + build green, pushed.
+- 19/07/2026 · (next) · Milestone 2 — Project types + STATUS_META, file/blob store, /api/projects CRUD, 6 seeded Illawarra jobs. tsc + build green.
