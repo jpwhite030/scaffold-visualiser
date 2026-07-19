@@ -48,6 +48,25 @@ milestone if push works without prompting; otherwise leave commits local.
 - Do NOT touch: api/analyze routes, apiGuard, corrections flow.
 - If a step fails twice, note why here under "Blockers", skip, move on.
 
+## Round 2 — reference-parity polish (started 19/07/2026 after Jack's feedback)
+Round 1 shipped; Jack then flagged the render as too blocky vs The Scaffold
+Software references. Commit b94de66 fixed the big ones (light studio scene,
+galvanised silver, timber boards, V-pressings, camera framing) — verified by
+headless screenshot (scratchpad shoot.mjs + `npm run start -- -p 3113`).
+Remaining gap to the reference renders, one item per iteration, screenshot-
+verify EVERY visual change before committing, push after every commit:
+
+- [ ] Brick walls on HouseModel — reference shows brickwork (procedural brick
+      canvas texture, same pattern as the galv/grass textures; keep windows,
+      keep the cream render band on gables if simple). Screenshot before/after.
+- [ ] Hop-up brackets check: reference shows 3-board inside hop-ups at the
+      eave deck. Look at ScaffoldModel's inner-face decks in a close screenshot;
+      add simple hop-up brackets under the inner deck edge ONLY if visibly missing.
+- [ ] Full parity pass: shoot erected + kit + site-viewer screenshots, compare
+      against the two reference images (described in this plan's intro), fix
+      anything obviously off (colours, density, floating members), reshoot.
+- [ ] Final: fresh screenshots all green → done log, stop the loop.
+
 ## Blockers
 (none yet)
 
