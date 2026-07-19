@@ -29,6 +29,27 @@ const KS_TUBE    = '#607898';   // muted steel-blue — the Kwikstage body colou
 const KS_ROSETTE = '#8aaac8';   // slightly lighter — star rosette plates stand out
 const KS_BOARD   = '#8c8c8c';   // perforated steel boards
 
+// ── Kit view — every member coloured by its Kwikstage stock length ───────────
+// Matches the gear-list categories exactly, so the on-screen kit IS the load list.
+export const KIT_COLOURS = {
+  len24:  '#f2d94e',   // 2.4 m ledgers / boards — yellow
+  len18:  '#e88bb6',   // 1.8 m — pink
+  len12:  '#7ab3e8',   // 1.2 m (incl. TR12 transoms) — blue
+  len07:  '#7fd49a',   // 0.7 / 0.76 m — green
+  brace:  '#5ecfc0',   // diagonal bracing — teal
+  rail:   '#b39ddb',   // guardrails — violet
+  std:    '#c9ced6',   // standards / posts / small parts — light grey
+} as const;
+
+type KitLenKey = 'len24' | 'len18' | 'len12' | 'len07';
+
+function snapStockKey(len: number): KitLenKey {
+  const stocks: [number, KitLenKey][] = [[2.4, 'len24'], [1.8, 'len18'], [1.2, 'len12'], [0.76, 'len07']];
+  let best = stocks[0];
+  for (const s of stocks) if (Math.abs(s[0] - len) < Math.abs(best[0] - len)) best = s;
+  return best[1];
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function offsetPolygon(pts: [number, number][], dist: number): [number, number][] {
@@ -721,7 +742,7 @@ function makeGalvTexture(): THREE.CanvasTexture {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function ScaffoldModel({ data }: { data: BuildingData }) {
+export default function ScaffoldModel({ data, kitView = false }: { data: BuildingData; kitView?: boolean }) {
   const { tubes, boards, kickboards, rosettes, connectors, boardHooks, basePts } = useMemo(() => buildScaffold(data), [data]);
 
   // One shared material per part type — galvanised-steel PBR with a faint
@@ -736,6 +757,8 @@ export default function ScaffoldModel({ data }: { data: BuildingData }) {
         color, metalness: 0.9, roughness: 0.36, clearcoat: 0.35, clearcoatRoughness: 0.45,
         envMapIntensity: 1.2, roughnessMap: galv, ...o,
       });
+    const kitFlat = (color: string) =>
+      new THREE.MeshStandardMaterial({ color, metalness: 0.15, roughness: 0.55 });
     return {
       // Standards / ledgers / transoms / rails / bracing.
       tube: steel(KS_TUBE),
@@ -750,6 +773,14 @@ export default function ScaffoldModel({ data }: { data: BuildingData }) {
       jack: steel('#8a8a8a', { metalness: 0.85, roughness: 0.3, clearcoat: 0.3, envMapIntensity: 1.1 }),
       // Timber sole board under each leg — matte, no metalness.
       sole: new THREE.MeshStandardMaterial({ color: '#7a5a39', metalness: 0, roughness: 0.9 }),
+      // Kit-view flats — matte so the stock-length colours read clearly.
+      kitLen24:  kitFlat(KIT_COLOURS.len24),
+      kitLen18:  kitFlat(KIT_COLOURS.len18),
+      kitLen12:  kitFlat(KIT_COLOURS.len12),
+      kitLen07:  kitFlat(KIT_COLOURS.len07),
+      kitBrace:  kitFlat(KIT_COLOURS.brace),
+      kitRail:   kitFlat(KIT_COLOURS.rail),
+      kitStd:    kitFlat(KIT_COLOURS.std),
       // Kept so the disposal effect frees the shared texture too.
       galv,
     };
@@ -758,23 +789,45 @@ export default function ScaffoldModel({ data }: { data: BuildingData }) {
   // Free the GPU material resources when the model unmounts / data changes.
   useEffect(() => () => { Object.values(mats).forEach(m => m.dispose()); }, [mats]);
 
+  // Kit-view material for a tube, inferred from its geometry: vertical members
+  // are standards/posts; brace- and rail-radius tubes are bracing/guardrails;
+  // stubs under 0.5 m are ties and ladder rungs; everything else is a ledger or
+  // transom coloured by nearest stock length.
+  const kitTubeMat = (t: Tube): THREE.Material => {
+    const vertical = t.rot[0] === 0 && t.rot[1] === 0 && t.rot[2] === 0;
+    if (vertical) return mats.kitStd;
+    if (t.r === BRACE_R) return mats.kitBrace;
+    if (t.r === RAIL_R) return mats.kitRail;
+    if (t.length < 0.5) return mats.kitStd;
+    return kitLenMat(t.length);
+  };
+  const kitLenMat = (len: number): THREE.Material => {
+    switch (snapStockKey(len)) {
+      case 'len24': return mats.kitLen24;
+      case 'len18': return mats.kitLen18;
+      case 'len12': return mats.kitLen12;
+      default:      return mats.kitLen07;
+    }
+  };
+
   return (
     <group>
       {/* All steel tubes — standards, ledgers, transoms, rails, bracing */}
-      {tubes.map((t, i) => <TubeMesh key={i} t={t} mat={mats.tube} />)}
+      {tubes.map((t, i) => <TubeMesh key={i} t={t} mat={kitView ? kitTubeMat(t) : mats.tube} />)}
 
       {/* Kwikstage star rosettes at every 500 mm on each standard */}
-      {rosettes.map((r, i) => <RosetteNode key={`r${i}`} {...r} mat={mats.rosette} />)}
+      {rosettes.map((r, i) => <RosetteNode key={`r${i}`} {...r} mat={kitView ? mats.kitStd : mats.rosette} />)}
 
       {/* Forged ledger/transom heads clamped on the rosettes (instanced) */}
-      <InstancedBoxes items={connectors} size={[0.06, 0.092, 0.052]} mat={mats.tube} />
+      <InstancedBoxes items={connectors} size={[0.06, 0.092, 0.052]} mat={kitView ? mats.kitStd : mats.tube} />
 
       {/* Steel-batten end hooks draped over the transoms (instanced) */}
-      <InstancedBoxes items={boardHooks} size={[0.02, 0.07, 0.234]} mat={mats.board} />
+      <InstancedBoxes items={boardHooks} size={[0.02, 0.07, 0.234]} mat={kitView ? mats.kitStd : mats.board} />
 
-      {/* Flat perforated steel boards */}
+      {/* Flat perforated steel boards — kit view colours each by stock length */}
       {boards.map((b, i) => (
-        <mesh key={`b${i}`} position={[b.cx, b.cy, b.cz]} rotation={[0, b.rotY, 0]} castShadow material={mats.board}>
+        <mesh key={`b${i}`} position={[b.cx, b.cy, b.cz]} rotation={[0, b.rotY, 0]} castShadow
+          material={kitView ? kitLenMat(b.length) : mats.board}>
           <boxGeometry args={[b.length, 0.038, b.depth]} />
         </mesh>
       ))}

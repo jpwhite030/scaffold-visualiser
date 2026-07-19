@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { BuildingData, footprintBounds } from '@/lib/buildingTypes';
 import { computeGearList } from '@/lib/gearList';
 import HouseModel from './HouseModel';
-import ScaffoldModel from './ScaffoldModel';
+import ScaffoldModel, { KIT_COLOURS } from './ScaffoldModel';
 import SceneChrome, { ToggleBtn } from './SceneChrome';
 import GearListModal from './GearListModal';
 
@@ -16,7 +16,8 @@ export default function ViewerClient({ data }: { data: BuildingData }) {
   const [showHouse, setShowHouse] = useState(true);
   const [showScaffold, setShowScaffold] = useState(true);
   const [showGearList, setShowGearList] = useState(false);
-  const gearList = showGearList ? computeGearList(data) : null;
+  const [kitView, setKitView] = useState(false);
+  const gearList = (showGearList || kitView) ? computeGearList(data) : null;
 
   const bounds = footprintBounds(data.footprint);
   const diagH = Math.sqrt((bounds.maxX - bounds.minX) ** 2 + (bounds.maxZ - bounds.minZ) ** 2);
@@ -60,6 +61,7 @@ export default function ViewerClient({ data }: { data: BuildingData }) {
         <div className="flex gap-2">
           <ToggleBtn label="House" active={showHouse} onClick={() => setShowHouse(v => !v)} />
           <ToggleBtn label="Scaffold" active={showScaffold} onClick={() => setShowScaffold(v => !v)} />
+          <ToggleBtn label="Kit view" active={kitView} onClick={() => setKitView(v => !v)} />
           <button
             onClick={() => setShowGearList(true)}
             className="text-sm px-4 py-2 rounded-lg font-medium transition-colors bg-black/50 text-white hover:bg-black/70 shadow"
@@ -83,6 +85,34 @@ export default function ViewerClient({ data }: { data: BuildingData }) {
         />
       )}
 
+      {kitView && gearList && (() => {
+        const led = gearList.ledgers, brd = gearList.deckBoards;
+        const stdTotal = Object.values(gearList.standards).reduce((s, n) => s + n, 0);
+        const part = (n: number | undefined, word: string) => (n ? `${n} ${word}` : null);
+        const row = (colour: string, label: string, bits: (string | null)[]) => {
+          const detail = bits.filter(Boolean).join(' · ');
+          return detail ? (
+            <div key={label} className="flex items-center gap-2.5">
+              <span className="w-3.5 h-3.5 rounded-sm shrink-0" style={{ background: colour }} />
+              <span className="text-gray-200 w-16 shrink-0">{label}</span>
+              <span className="text-gray-400">{detail}</span>
+            </div>
+          ) : null;
+        };
+        return (
+          <div className="absolute bottom-6 left-4 z-10 bg-black/60 backdrop-blur rounded-lg px-4 py-3 text-xs space-y-1.5">
+            <p className="text-white font-semibold text-sm">Kit — by stock length</p>
+            {row(KIT_COLOURS.len24, '2.4 m', [part(led['2.4m'], 'ledgers'), part(brd['2.4m'], 'boards')])}
+            {row(KIT_COLOURS.len18, '1.8 m', [part(led['1.8m'], 'ledgers'), part(brd['1.8m'], 'boards')])}
+            {row(KIT_COLOURS.len12, '1.2 m', [part(led['1.2m'], 'ledgers'), part(brd['1.2m'], 'boards'), part(gearList.transoms, 'transoms')])}
+            {row(KIT_COLOURS.len07, '0.76 m', [part(led['0.76m'], 'ledgers'), part(brd['0.76m'], 'boards')])}
+            {row(KIT_COLOURS.brace, 'Braces', [part(gearList.braces, 'pcs')])}
+            {row(KIT_COLOURS.rail, 'Rails', [part(gearList.guardrails, 'pcs')])}
+            {row(KIT_COLOURS.std, 'Standards', [part(stdTotal, 'pcs')])}
+          </div>
+        );
+      })()}
+
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
         <p className="bg-black/50 backdrop-blur text-gray-300 text-xs px-4 py-2 rounded-full">
           Drag to rotate · Scroll to zoom · Right-click to pan
@@ -94,7 +124,7 @@ export default function ViewerClient({ data }: { data: BuildingData }) {
         <SceneChrome groundSpread={groundSpread} shadowFar={data.eave_height_m + 6} />
         <group>
           {showHouse && <HouseModel data={data} />}
-          {showScaffold && <ScaffoldModel data={data} />}
+          {showScaffold && <ScaffoldModel data={data} kitView={kitView} />}
         </group>
         <OrbitControls makeDefault target={[0, targetHeight, 0]} minDistance={3} maxDistance={150} maxPolarAngle={Math.PI / 2 - 0.02} />
       </Canvas>
