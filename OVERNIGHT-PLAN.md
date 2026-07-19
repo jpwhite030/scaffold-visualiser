@@ -23,11 +23,12 @@ milestone if push works without prompting; otherwise leave commits local.
 - [x] Seed `data/projects.json` with 6 realistic Illawarra jobs (Dapto, Thirroul, Shellharbour, Kiama, Keiraville, Corrimal), hardcoded lat/lng, mixed statuses, prices $4.3k–$18.4k.
 
 ## Milestone 3 — Live map page (`/map`)
-- [ ] Leaflet via CDN-free npm install (`leaflet`, no react-leaflet needed if a small wrapper is simpler with React 19). OSM tiles (no API key). Dynamic import, `ssr: false`.
-- [ ] Layout copied from reference screenshot: full-bleed map, right sidebar (~320px) listing projects — id, status badge, name, client, 📍 address, price, "Open Project →". Top pill bar: All / Order / Booked In / Live / Off-Hired filters with status dot colours: order = amber, booked = blue, live = green, off-hired = red.
-- [ ] Map pins coloured by same status colours; click pin ⇄ highlight sidebar card; "N projects found" count top-right.
-- [ ] Clicking "Open Project" with a `building` snapshot loads it into sessionStorage and routes to `/viewer`; without one, shows project details.
-- [ ] Nav: add "Map" link to landing page header + viewer pages.
+- [x] Leaflet via npm (no react-leaflet — direct L.map in a client component). OSM tiles (no API key). Dynamic import, `ssr: false`, leaflet.css imported in globals.css.
+- [x] Layout copied from reference screenshot: full-bleed map, right sidebar (340px) listing projects — id, status badge, name, client, 📍 address, price, "Open Project →". Top pill bar: All / Order / Booked In / Live / Off-Hired filters with status dots.
+- [x] Map pins (circle markers) coloured by status; click pin ⇄ select + scroll sidebar card; flyTo on select; fitBounds on load; "N projects found" count top-right.
+- [x] "Open Project" with a `building` snapshot loads sessionStorage `buildingData` and routes to `/viewer`; without one shows "No 3D model".
+- [x] Nav: "Live job map" button on landing page (top-right) + "Map" button in viewer controls.
+- [x] Smoke-tested against `next start`: /map → 200, /api/projects returns the 6 seeds.
 
 ## Milestone 4 — Add-a-job flow
 - [ ] Small form (modal or `/map/new`): name, client, address fields, price, status. Geocode on submit via Nominatim (`https://nominatim.openstreetmap.org/search?format=json&q=...`, User-Agent header, one call per submit) with manual lat/lng override fields as fallback. Server-side route to avoid CORS/rate issues.
@@ -51,4 +52,5 @@ milestone if push works without prompting; otherwise leave commits local.
 ## Done log
 (append one line per completed milestone: date, commit hash, what)
 - 19/07/2026 · 722e381 · Milestone 1 — kit view toggle, stock-length colours, legend overlay. tsc + build green, pushed.
-- 19/07/2026 · (next) · Milestone 2 — Project types + STATUS_META, file/blob store, /api/projects CRUD, 6 seeded Illawarra jobs. tsc + build green.
+- 19/07/2026 · d83d7f5 · Milestone 2 — Project types + STATUS_META, file/blob store, /api/projects CRUD, 6 seeded Illawarra jobs. tsc + build green.
+- 19/07/2026 · (next) · Milestone 3 — /map live job map: Leaflet+OSM, status pins, filter pills, sidebar cards, Open Project → viewer, nav links. Smoke-tested 200s.

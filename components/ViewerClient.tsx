@@ -69,6 +69,12 @@ export default function ViewerClient({ data }: { data: BuildingData }) {
             Gear List
           </button>
           <button
+            onClick={() => router.push('/map')}
+            className="text-sm px-4 py-2 rounded-lg font-medium transition-colors bg-black/50 text-white hover:bg-black/70 shadow"
+          >
+            Map
+          </button>
+          <button
             onClick={() => { sessionStorage.setItem('quoteMode', 'building'); router.push('/quote'); }}
             className="text-sm px-4 py-2 rounded-lg font-medium transition-colors bg-orange-500 hover:bg-orange-600 text-white shadow"
           >
