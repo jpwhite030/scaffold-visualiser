@@ -56,16 +56,16 @@ headless screenshot (scratchpad shoot.mjs + `npm run start -- -p 3113`).
 Remaining gap to the reference renders, one item per iteration, screenshot-
 verify EVERY visual change before committing, push after every commit:
 
-- [ ] Brick walls on HouseModel — reference shows brickwork (procedural brick
-      canvas texture, same pattern as the galv/grass textures; keep windows,
-      keep the cream render band on gables if simple). Screenshot before/after.
-- [ ] Hop-up brackets check: reference shows 3-board inside hop-ups at the
-      eave deck. Look at ScaffoldModel's inner-face decks in a close screenshot;
-      add simple hop-up brackets under the inner deck edge ONLY if visibly missing.
-- [ ] Full parity pass: shoot erected + kit + site-viewer screenshots, compare
-      against the two reference images (described in this plan's intro), fix
-      anything obviously off (colours, density, floating members), reshoot.
-- [ ] Final: fresh screenshots all green → done log, stop the loop.
+- [x] Brick walls on HouseModel — metre-scale UVs + 1 m procedural running-bond
+      brick tile (86 mm courses, 240 mm bricks, mortar, per-brick jitter).
+      Screenshot-verified (scratchpad brick.png). Commit 59ce984.
+- [x] Hop-up brackets check — SKIPPED per the plan's own condition: the eave
+      lift is fully boarded to the wall line in brick.png; nothing visibly missing.
+- [x] Full parity pass — erected (brick.png), kit (kit2.png) and site viewer
+      (site.png) all inspected against the references: light scene, galvanised
+      silver, timber decks, yellow toes, brick, coloured kit + legend. No
+      floating members, no colour misses.
+- [x] Final: fresh screenshots all green → done log, loop stopped.
 
 ## Blockers
 (none yet)
@@ -76,5 +76,7 @@ verify EVERY visual change before committing, push after every commit:
 - 19/07/2026 · d83d7f5 · Milestone 2 — Project types + STATUS_META, file/blob store, /api/projects CRUD, 6 seeded Illawarra jobs. tsc + build green.
 - 19/07/2026 · 1d5bb5d · Milestone 3 — /map live job map: Leaflet+OSM, status pins, filter pills, sidebar cards, Open Project → viewer, nav links. Smoke-tested 200s.
 - 19/07/2026 · c953091 · Milestone 4 — SaveProjectModal + /api/geocode + Add job on map + Save to job map on quote. CRUD + geocode smoke-tested.
-- 19/07/2026 · (next) · Milestone 5 — site-viewer kit toggle, README rewrite, parity check. ALL MILESTONES DONE.
+- 19/07/2026 · 77a83bd · Milestone 5 — site-viewer kit toggle, README rewrite, parity check. Round 1 done.
+- 19/07/2026 · b94de66 · Round 2 — realism pass: light studio scene, galvanised silver, timber boards, V-pressings, camera framing. Screenshot-verified.
+- 19/07/2026 · 59ce984 · Round 2 — brick walls, screenshot-verified. Parity pass green across erected/kit/site views. ALL WORK DONE, loop stopped.
 - NOTE: always `cd /Users/jpwhi/scaffold-visualiser` inside every Bash command — session cwd resets to tally-marketing-os between turns, and one smoke test silently ran against the wrong repo before being caught and re-run.
