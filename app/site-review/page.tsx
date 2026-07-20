@@ -9,6 +9,7 @@ import {
   newSiteBuilding, scaleSite, syncFaceArrays, siteUid,
 } from '@/lib/siteTypes';
 import { BackgroundPolygon, Field, FootprintEditor, faceLabel } from '@/components/FootprintEditor';
+import ScaleControl from '@/components/ScaleControl';
 
 type Selection =
   | { type: 'boundary' }
@@ -273,6 +274,36 @@ export default function SiteReviewPage() {
               min={5} max={150} step={0.5}
             />
           </div>
+
+          <ScaleControl
+            heading="Scale whole site"
+            blurb="Site plan traced the wrong size? Scale the boundary, every building, driveway and tree together — positions and proportions stay put."
+            onApply={(f, includeHeights) => {
+              setSite(prev => {
+                const b = footprintBounds(prev.boundary);
+                const scaled = scaleSite(
+                  prev,
+                  Math.max(1, Math.round((b.maxX - b.minX) * f * 10) / 10),
+                  Math.max(1, Math.round((b.maxZ - b.minZ) * f * 10) / 10),
+                );
+                if (!includeHeights) return scaled;
+                return {
+                  ...scaled,
+                  buildings: scaled.buildings.map(bd => ({
+                    ...bd,
+                    data: {
+                      ...bd.data,
+                      wall_height_m: bd.data.wall_height_m * f,
+                      eave_height_m: bd.data.eave_height_m * f,
+                      ...(bd.data.face_eave_heights
+                        ? { face_eave_heights: bd.data.face_eave_heights.map(h => h * f) }
+                        : {}),
+                    },
+                  })),
+                };
+              });
+            }}
+          />
 
           {/* Selection pills */}
           <div className="flex flex-wrap gap-2 mb-3">

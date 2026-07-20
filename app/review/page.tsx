@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { BuildingData, DEFAULT_BUILDING, footprintBounds } from '@/lib/buildingTypes';
+import { BuildingData, DEFAULT_BUILDING, footprintBounds, scaleBuilding } from '@/lib/buildingTypes';
 import { Field, FootprintEditor, faceLabel } from '@/components/FootprintEditor';
+import ScaleControl from '@/components/ScaleControl';
 
 export default function ReviewPage() {
   const router = useRouter();
@@ -154,6 +155,16 @@ export default function ReviewPage() {
               min={5} max={60} step={0.5}
             />
           </div>
+          <ScaleControl
+            heading="Scale whole model"
+            blurb="Trace came out the wrong size? Scale width, depth and the footprint together — proportions stay put, and the scaffold regenerates to the corrected size."
+            onApply={(f, includeHeights) => {
+              setData(prev => scaleBuilding(prev, f, includeHeights));
+              setWorldW(prev => Math.max(1, Math.round(prev * f * 10) / 10));
+              setWorldD(prev => Math.max(1, Math.round(prev * f * 10) / 10));
+            }}
+          />
+
           <FootprintEditor
             footprint={data.footprint}
             imageDataUrl={imageDataUrl}
