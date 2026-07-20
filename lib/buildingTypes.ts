@@ -83,6 +83,31 @@ export function computeFootprint(d: BuildingData): [number, number][] {
   }
 }
 
+/**
+ * Uniformly scale a building — the calibration control in the viewer. Keeps
+ * proportions (unlike the review page's independent width/depth stretch) so a
+ * traced plan that's 10% off comes right without distorting the shape. Heights
+ * are usually known from elevations, so they only scale when asked.
+ */
+export function scaleBuilding(d: BuildingData, factor: number, includeHeights = false): BuildingData {
+  const f = Math.min(4, Math.max(0.25, factor));
+  if (f === 1) return d;
+  const scaled: BuildingData = {
+    ...d,
+    overall_width_m: d.overall_width_m * f,
+    overall_depth_m: d.overall_depth_m * f,
+    notch_width_m: d.notch_width_m * f,
+    notch_depth_m: d.notch_depth_m * f,
+    footprint: d.footprint.map(([x, z]) => [x * f, z * f] as [number, number]),
+  };
+  if (includeHeights) {
+    scaled.wall_height_m = d.wall_height_m * f;
+    scaled.eave_height_m = d.eave_height_m * f;
+    if (d.face_eave_heights) scaled.face_eave_heights = d.face_eave_heights.map(h => h * f);
+  }
+  return scaled;
+}
+
 export function footprintBounds(pts: [number, number][]) {
   const xs = pts.map(p => p[0]);
   const zs = pts.map(p => p[1]);
