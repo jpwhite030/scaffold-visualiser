@@ -276,31 +276,17 @@ export default function SiteReviewPage() {
           </div>
 
           <ScaleControl
-            heading="Scale whole site"
-            blurb="Site plan traced the wrong size? Scale the boundary, every building, driveway and tree together — positions and proportions stay put."
-            onApply={(f, includeHeights) => {
+            heading="Plan scale"
+            blurb="The trace loads as if the site plan is 1:100. Printed at a different scale? Pick it and the boundary, buildings, driveways and trees all resize together."
+            storageKey="planScaleSite"
+            onApply={f => {
               setSite(prev => {
                 const b = footprintBounds(prev.boundary);
-                const scaled = scaleSite(
+                return scaleSite(
                   prev,
                   Math.max(1, Math.round((b.maxX - b.minX) * f * 10) / 10),
                   Math.max(1, Math.round((b.maxZ - b.minZ) * f * 10) / 10),
                 );
-                if (!includeHeights) return scaled;
-                return {
-                  ...scaled,
-                  buildings: scaled.buildings.map(bd => ({
-                    ...bd,
-                    data: {
-                      ...bd.data,
-                      wall_height_m: bd.data.wall_height_m * f,
-                      eave_height_m: bd.data.eave_height_m * f,
-                      ...(bd.data.face_eave_heights
-                        ? { face_eave_heights: bd.data.face_eave_heights.map(h => h * f) }
-                        : {}),
-                    },
-                  })),
-                };
               });
             }}
           />

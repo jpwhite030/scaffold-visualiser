@@ -1,71 +1,83 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-// One-shot uniform scale for the review pages — for when the whole trace came
-// out the wrong size. Type a percentage (or tap a preset), Apply multiplies
-// every dimension once, and the field snaps back to 100% ready for another go.
-export default function ScaleControl({ heading, blurb, onApply }: {
+const PRESETS = [50, 100, 200, 500];
+
+// Plan-scale selector for the review pages. The trace loads as if the drawing
+// were 1:100; if it's actually printed at another scale, picking it rescales
+// every plan dimension by the ratio change (1:100 → 1:200 doubles everything,
+// and picking 1:100 again halves it back). The assumed scale is remembered in
+// sessionStorage so leaving and returning to the page can't double-apply;
+// a fresh upload clears it back to 1:100.
+export default function ScaleControl({ heading, blurb, storageKey, onApply }: {
   heading: string;
   blurb: string;
-  onApply: (factor: number, includeHeights: boolean) => void;
+  /** sessionStorage key remembering the assumed scale for this trace. */
+  storageKey: string;
+  /** Called with the factor to multiply every plan dimension by. */
+  onApply: (factor: number) => void;
 }) {
-  const [pct, setPct] = useState('100');
-  const [includeHeights, setIncludeHeights] = useState(false);
+  const [current, setCurrent] = useState(100);
+  const [customN, setCustomN] = useState('');
 
-  const factor = Number(pct) / 100;
-  const valid = Number.isFinite(factor) && factor >= 0.25 && factor <= 4;
+  useEffect(() => {
+    try {
+      const saved = Number(sessionStorage.getItem(storageKey));
+      if (Number.isFinite(saved) && saved >= 1 && saved <= 2000) setCurrent(saved);
+    } catch { /* ignore */ }
+  }, [storageKey]);
 
-  const apply = (f: number) => {
-    if (!Number.isFinite(f) || f < 0.25 || f > 4 || f === 1) return;
-    onApply(f, includeHeights);
-    setPct('100');
+  const pick = (n: number) => {
+    if (!Number.isFinite(n) || n < 1 || n > 2000 || n === current) return;
+    onApply(n / current);
+    setCurrent(n);
+    try { sessionStorage.setItem(storageKey, String(n)); } catch { /* ignore */ }
   };
 
   return (
     <div className="mt-3 border-t border-gray-100 pt-3">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 mb-2">
-        <label className="text-sm font-medium text-gray-700">{heading}</label>
-        <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={includeHeights}
-            onChange={e => setIncludeHeights(e.target.checked)}
-            className="accent-orange-500 w-3.5 h-3.5"
-          />
-          Also scale heights
-        </label>
-      </div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{heading}</label>
       <p className="text-xs text-gray-400 mb-2">{blurb}</p>
       <div className="flex flex-wrap items-center gap-2">
-        {[90, 95, 105, 110].map(p => (
+        {PRESETS.map(n => (
           <button
-            key={p}
+            key={n}
             type="button"
-            onClick={() => apply(p / 100)}
-            className="text-xs font-semibold px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 bg-white hover:border-orange-400 hover:text-orange-600 transition-colors"
+            onClick={() => pick(n)}
+            className={`text-xs font-semibold px-3 py-1.5 rounded-md border transition-colors ${
+              current === n
+                ? 'bg-orange-500 border-orange-500 text-white'
+                : 'border-gray-300 text-gray-600 bg-white hover:border-orange-400 hover:text-orange-600'
+            }`}
           >
-            {p}%
+            1:{n}
           </button>
         ))}
-        <div className="relative ml-auto">
+        {!PRESETS.includes(current) && (
+          <span className="text-xs font-semibold px-3 py-1.5 rounded-md bg-orange-500 border border-orange-500 text-white">
+            1:{current}
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-1.5">
+          <span className="text-sm text-gray-500">1 :</span>
           <input
-            type="number" min={25} max={400} step={1}
-            value={pct}
-            onChange={e => setPct(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') apply(factor); }}
-            className="w-24 border border-gray-300 rounded-lg pl-3 pr-7 py-1.5 text-sm text-gray-900 focus:ring-2 focus:ring-orange-400 focus:border-transparent outline-none"
+            type="number" min={1} max={2000} step={1}
+            value={customN}
+            placeholder={String(current)}
+            onChange={e => setCustomN(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { pick(Number(customN)); setCustomN(''); } }}
+            className="w-20 border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-900 focus:ring-2 focus:ring-orange-400 focus:border-transparent outline-none"
           />
-          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">%</span>
+          <button
+            type="button"
+            onClick={() => { pick(Number(customN)); setCustomN(''); }}
+            disabled={!customN || Number(customN) < 1 || Number(customN) === current}
+            className="bg-orange-500 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition-colors"
+          >
+            Set
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => apply(factor)}
-          disabled={!valid || factor === 1}
-          className="bg-orange-500 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition-colors"
-        >
-          Apply
-        </button>
       </div>
     </div>
   );

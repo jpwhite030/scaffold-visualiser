@@ -9,11 +9,11 @@ Built for [Skelscaff](mailto:jack@skelscaff.com.au) on Next.js + React Three Fib
 
 - **Plan → 3D** — upload a floor plan/elevations (PDF or image); AI traces the
   footprint and heights, editable on the review page. Or enter dimensions manually.
-- **Scale calibration** — on the review pages, for when a traced plan comes
-  out the wrong size: scale the whole model (or the whole site — boundary,
-  buildings, driveways, trees) by a percentage, heights optionally included.
-  Proportions stay put; the scaffold, gear list and quote regenerate from the
-  corrected size.
+- **Plan scale** — on the review pages: the trace loads as if the drawing is
+  1:100; if it's printed at 1:50 / 1:200 / 1:500 (or any custom 1:N), pick it
+  and every plan dimension resizes to suit (whole site included — boundary,
+  buildings, driveways, trees). Heights stay as entered. The scaffold, gear
+  list and quote regenerate from the corrected size.
 - **Kwikstage scaffold, modelled like it's erected** — 0.7/1.2/1.8/2.4 m bays on
   real ledger sizes, 2 m lifts, star rosettes every 500 mm, boarded lifts with
   toe boards, bracing, wall ties, a zig-zag stair tower (or ladder), roof-catch

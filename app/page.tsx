@@ -59,6 +59,10 @@ export default function UploadPage() {
           return;
         }
 
+        // New trace — forget the previous job's assumed plan scale
+        sessionStorage.removeItem('planScaleBuilding');
+        sessionStorage.removeItem('planScaleSite');
+
         if (mode === 'site') {
           const data = (await res.json()) as SiteData;
           sessionStorage.setItem('siteData', JSON.stringify(data));
@@ -187,6 +191,7 @@ export default function UploadPage() {
                 onClick={() => {
                   sessionStorage.removeItem('siteData');
                   sessionStorage.removeItem('imageDataUrl');
+                  sessionStorage.removeItem('planScaleSite');
                   router.push('/site-review');
                 }}
               >
@@ -200,6 +205,7 @@ export default function UploadPage() {
                 className="text-orange-500 hover:underline font-medium"
                 onClick={() => {
                   sessionStorage.removeItem('analyzedBuilding');
+                  sessionStorage.removeItem('planScaleBuilding');
                   router.push('/review');
                 }}
               >

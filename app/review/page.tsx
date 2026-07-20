@@ -156,10 +156,11 @@ export default function ReviewPage() {
             />
           </div>
           <ScaleControl
-            heading="Scale whole model"
-            blurb="Trace came out the wrong size? Scale width, depth and the footprint together — proportions stay put, and the scaffold regenerates to the corrected size."
-            onApply={(f, includeHeights) => {
-              setData(prev => scaleBuilding(prev, f, includeHeights));
+            heading="Plan scale"
+            blurb="The trace loads as if the drawing is 1:100. Printed at a different scale? Pick it and every plan dimension resizes to suit — pick again to change your mind."
+            storageKey="planScaleBuilding"
+            onApply={f => {
+              setData(prev => scaleBuilding(prev, f));
               setWorldW(prev => Math.max(1, Math.round(prev * f * 10) / 10));
               setWorldD(prev => Math.max(1, Math.round(prev * f * 10) / 10));
             }}
