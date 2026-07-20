@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, RefObject } from 'react';
 import { useRouter } from 'next/navigation';
 import { BuildingData, footprintBounds } from '@/lib/buildingTypes';
 import { SiteData } from '@/lib/siteTypes';
+import { QuoteRenders, loadQuoteRenders } from '@/lib/captureRenders';
 import SaveProjectModal from '@/components/SaveProjectModal';
 
 // ── Scaffold metrics ──────────────────────────────────────────────────────────
@@ -210,9 +211,12 @@ export default function QuotePage() {
   const [quote, setQuote] = useState<QuoteState | null>(null);
   const [showSave, setShowSave] = useState(false);
   const [buildingSnapshot, setBuildingSnapshot] = useState<BuildingData | null>(null);
+  const [renders, setRenders] = useState<QuoteRenders | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    setRenders(loadQuoteRenders());
     const mode = sessionStorage.getItem('quoteMode');
     if (mode === 'site') {
       const rawSite = sessionStorage.getItem('siteData');
@@ -258,6 +262,18 @@ export default function QuotePage() {
   const handlePrint = () => {
     saveCompany(quote);
     window.print();
+  };
+
+  // jsPDF only loads when the button is clicked — keeps it out of the page bundle.
+  const handleDownloadPdf = async () => {
+    saveCompany(quote);
+    setPdfBusy(true);
+    try {
+      const { generateQuotePdf } = await import('@/lib/quotePdf');
+      await generateQuotePdf(quote, { subtotal, gst, total }, renders);
+    } finally {
+      setPdfBusy(false);
+    }
   };
 
   return (
@@ -306,12 +322,20 @@ export default function QuotePage() {
             Save to job map
           </button>
           <button onClick={handlePrint}
-            className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-5 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm">
+            className="border border-gray-300 text-gray-600 hover:bg-gray-50 font-semibold px-5 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
             </svg>
-            Print / Save PDF
+            Print
+          </button>
+          <button onClick={handleDownloadPdf} disabled={pdfBusy}
+            className="bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold px-5 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+            </svg>
+            {pdfBusy ? 'Generating…' : 'Download PDF'}
           </button>
         </div>
       </div>
@@ -334,6 +358,7 @@ export default function QuotePage() {
       <div className="no-print min-h-screen bg-gray-100 py-8 px-4">
         <QuoteDocument
           quote={quote}
+          renders={renders}
           subtotal={subtotal}
           gst={gst}
           total={total}
@@ -349,6 +374,7 @@ export default function QuotePage() {
       <div className="print-only">
         <QuoteDocument
           quote={quote}
+          renders={renders}
           subtotal={subtotal}
           gst={gst}
           total={total}
@@ -366,11 +392,12 @@ export default function QuotePage() {
 // ── Quote document ────────────────────────────────────────────────────────────
 
 function QuoteDocument({
-  quote, subtotal, gst, total,
+  quote, renders, subtotal, gst, total,
   set, setLine, removeLine, addLine,
   contentRef,
 }: {
   quote: QuoteState;
+  renders: QuoteRenders | null;
   subtotal: number; gst: number; total: number;
   set: (p: Partial<QuoteState>) => void;
   setLine: (id: string, p: Partial<QuoteLine>) => void;
@@ -444,6 +471,24 @@ function QuoteDocument({
           className="w-full bg-transparent text-sm text-gray-700 leading-relaxed resize-none outline-none"
         />
       </div>
+
+      {/* 3D renders captured when the quote was created */}
+      {renders?.hero && (
+        <div className={`mb-6 grid gap-4 ${renders.kit ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          <figure>
+            {/* eslint-disable-next-line @next/next/no-img-element -- session-local data URL, next/image adds nothing */}
+            <img src={renders.hero} alt="3D scaffold model — erected view" className="w-full rounded-xl border border-gray-100" />
+            <figcaption className="text-[10px] text-gray-400 text-center mt-1.5">3D scaffold model — erected view</figcaption>
+          </figure>
+          {renders.kit && (
+            <figure>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={renders.kit} alt="Kit view — coloured by stock length" className="w-full rounded-xl border border-gray-100" />
+              <figcaption className="text-[10px] text-gray-400 text-center mt-1.5">Kit view — coloured by stock length</figcaption>
+            </figure>
+          )}
+        </div>
+      )}
 
       {/* Line items */}
       <table className="w-full text-sm mb-2">

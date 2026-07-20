@@ -66,6 +66,12 @@ export interface GuardOptions {
   limit: number;
   /** Window length in milliseconds. */
   windowMs: number;
+  /**
+   * Skip the same-origin check (rate limit only). For routes that are meant to
+   * be reachable from outside the app — e.g. the public share link, where the
+   * unguessable token is the access control, not the Origin header.
+   */
+  requireSameOrigin?: boolean;
 }
 
 /**
@@ -76,7 +82,7 @@ export interface GuardOptions {
  *   if (blocked) return blocked;
  */
 export function guard(request: NextRequest, opts: GuardOptions): Response | null {
-  if (!isSameOrigin(request)) {
+  if (opts.requireSameOrigin !== false && !isSameOrigin(request)) {
     return Response.json({ error: 'Forbidden.' }, { status: 403 });
   }
 

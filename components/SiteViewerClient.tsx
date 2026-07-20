@@ -1,12 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Line } from '@react-three/drei';
 import { useRouter } from 'next/navigation';
 import { footprintBounds } from '@/lib/buildingTypes';
 import { SiteData, buildingLocalFrame } from '@/lib/siteTypes';
 import { computeGearList, sumGearLists } from '@/lib/gearList';
+import { captureQuoteRenders } from '@/lib/captureRenders';
 import HouseModel from './HouseModel';
 import ScaffoldModel from './ScaffoldModel';
 import SceneChrome, { ToggleBtn } from './SceneChrome';
@@ -15,6 +16,8 @@ import { GroundPoly, PalingFence, StreetScene, Tree, findStreetEdge, useSiteMate
 
 export default function SiteViewerClient({ site: initialSite }: { site: SiteData }) {
   const router = useRouter();
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [capturing, setCapturing] = useState(false);
   const [site, setSite] = useState<SiteData>(initialSite);
   const [showHouses, setShowHouses] = useState(true);
   const [showScaffold, setShowScaffold] = useState(true);
@@ -129,10 +132,16 @@ export default function SiteViewerClient({ site: initialSite }: { site: SiteData
             Gear List
           </button>
           <button
-            onClick={() => { sessionStorage.setItem('quoteMode', 'site'); router.push('/quote'); }}
-            className="text-sm px-4 py-2 rounded-lg font-medium transition-colors bg-orange-500 hover:bg-orange-600 text-white shadow"
+            disabled={capturing}
+            onClick={async () => {
+              setCapturing(true);
+              sessionStorage.setItem('quoteMode', 'site');
+              await captureQuoteRenders(canvasRef.current, setKitView, kitView);
+              router.push('/quote');
+            }}
+            className="text-sm px-4 py-2 rounded-lg font-medium transition-colors bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white shadow"
           >
-            Create Quote
+            {capturing ? 'Preparing…' : 'Create Quote'}
           </button>
         </div>
       </div>
@@ -158,7 +167,8 @@ export default function SiteViewerClient({ site: initialSite }: { site: SiteData
       </div>
 
       <Canvas shadows camera={{ position: [cameraDistance, cameraHeight, cameraDistance], fov: 45 }}
-        gl={{ antialias: true, toneMappingExposure: 1.05 }}>
+        gl={{ antialias: true, toneMappingExposure: 1.05, preserveDrawingBuffer: true }}
+        onCreated={({ gl }) => { canvasRef.current = gl.domElement; }}>
         <SceneChrome groundSpread={groundSpread} shadowFar={Math.max(maxEave, 3) + 6} />
         <SiteScenery site={site} streetEdge={streetEdge} fenceOpenings={fenceOpenings} boundaryLine={boundaryLine} />
 

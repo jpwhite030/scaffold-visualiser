@@ -1,18 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { useRouter } from 'next/navigation';
 import { BuildingData, footprintBounds } from '@/lib/buildingTypes';
 import { computeGearList } from '@/lib/gearList';
+import { captureQuoteRenders } from '@/lib/captureRenders';
 import HouseModel from './HouseModel';
 import ScaffoldModel, { KIT_COLOURS } from './ScaffoldModel';
 import SceneChrome, { ToggleBtn } from './SceneChrome';
 import GearListModal from './GearListModal';
 
-export default function ViewerClient({ data }: { data: BuildingData }) {
+export default function ViewerClient({ data, readOnly = false, header }: {
+  data: BuildingData;
+  /** Share-link mode: keeps the view toggles + gear list, drops every route into the app. */
+  readOnly?: boolean;
+  header?: { title: string; subtitle?: string };
+}) {
   const router = useRouter();
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [capturing, setCapturing] = useState(false);
   const [showHouse, setShowHouse] = useState(true);
   const [showScaffold, setShowScaffold] = useState(true);
   const [showGearList, setShowGearList] = useState(false);
@@ -40,13 +48,23 @@ export default function ViewerClient({ data }: { data: BuildingData }) {
   return (
     <div className="relative w-full h-full">
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-3">
-        <button onClick={() => router.push('/review')}
-          className="flex items-center gap-2 bg-black/60 hover:bg-black/80 text-white text-sm px-3 py-2 rounded-lg backdrop-blur transition-colors">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Edit dimensions
-        </button>
+        {readOnly ? (
+          header && (
+            <div className="bg-black/60 backdrop-blur rounded-lg px-4 py-3 max-w-xs">
+              <p className="text-white font-semibold text-sm leading-snug">{header.title}</p>
+              {header.subtitle && <p className="text-gray-400 text-xs mt-0.5">{header.subtitle}</p>}
+              <p className="text-orange-400 text-[11px] font-semibold mt-2 uppercase tracking-wide">Prepared by Skelscaff</p>
+            </div>
+          )
+        ) : (
+          <button onClick={() => router.push('/review')}
+            className="flex items-center gap-2 bg-black/60 hover:bg-black/80 text-white text-sm px-3 py-2 rounded-lg backdrop-blur transition-colors">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Edit dimensions
+          </button>
+        )}
         <div className="bg-black/60 backdrop-blur rounded-lg px-4 py-3 grid grid-cols-2 gap-x-6 gap-y-2">
           <DimPill label="Width" value={`${w}m`} />
           <DimPill label="Length" value={`${l}m`} />
@@ -68,18 +86,28 @@ export default function ViewerClient({ data }: { data: BuildingData }) {
           >
             Gear List
           </button>
-          <button
-            onClick={() => router.push('/map')}
-            className="text-sm px-4 py-2 rounded-lg font-medium transition-colors bg-black/50 text-white hover:bg-black/70 shadow"
-          >
-            Map
-          </button>
-          <button
-            onClick={() => { sessionStorage.setItem('quoteMode', 'building'); router.push('/quote'); }}
-            className="text-sm px-4 py-2 rounded-lg font-medium transition-colors bg-orange-500 hover:bg-orange-600 text-white shadow"
-          >
-            Create Quote
-          </button>
+          {!readOnly && (
+            <>
+              <button
+                onClick={() => router.push('/map')}
+                className="text-sm px-4 py-2 rounded-lg font-medium transition-colors bg-black/50 text-white hover:bg-black/70 shadow"
+              >
+                Map
+              </button>
+              <button
+                disabled={capturing}
+                onClick={async () => {
+                  setCapturing(true);
+                  sessionStorage.setItem('quoteMode', 'building');
+                  await captureQuoteRenders(canvasRef.current, setKitView, kitView);
+                  router.push('/quote');
+                }}
+                className="text-sm px-4 py-2 rounded-lg font-medium transition-colors bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white shadow"
+              >
+                {capturing ? 'Preparing…' : 'Create Quote'}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -126,7 +154,8 @@ export default function ViewerClient({ data }: { data: BuildingData }) {
       </div>
 
       <Canvas shadows camera={{ position: [cameraDistance, cameraHeight, cameraDistance], fov: 45 }}
-        gl={{ antialias: true, toneMappingExposure: 1.05 }}>
+        gl={{ antialias: true, toneMappingExposure: 1.05, preserveDrawingBuffer: true }}
+        onCreated={({ gl }) => { canvasRef.current = gl.domElement; }}>
         <SceneChrome groundSpread={groundSpread} shadowFar={data.eave_height_m + 6} />
         <group>
           {showHouse && <HouseModel data={data} />}

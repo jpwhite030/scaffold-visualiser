@@ -33,6 +33,7 @@ export default function MapClient() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const visible = useMemo(
     () => (filter === 'all' ? projects : projects.filter(p => p.status === filter)),
@@ -103,6 +104,38 @@ export default function MapClient() {
     if (!p.building) return;
     sessionStorage.setItem('buildingData', JSON.stringify(p.building));
     router.push('/viewer');
+  };
+
+  // Copy the public read-only 3D link. Older jobs saved before share links
+  // existed have no token yet — re-saving the project makes the server mint one.
+  const shareProject = async (p: Project) => {
+    if (!p.building) return;
+    let token = p.shareToken;
+    if (!token) {
+      try {
+        const res = await fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ project: p }),
+        });
+        const d = await res.json();
+        if (!d?.ok || !d.project?.shareToken) throw new Error('no token');
+        token = d.project.shareToken as string;
+        const saved = d.project as Project;
+        setProjects(prev => prev.map(x => (x.id === saved.id ? saved : x)));
+      } catch {
+        setLoadError('Could not create a share link — try again.');
+        return;
+      }
+    }
+    const url = `${window.location.origin}/share/${token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(p.id);
+      setTimeout(() => setCopiedId(c => (c === p.id ? null : c)), 2000);
+    } catch {
+      window.prompt('Copy the share link:', url);
+    }
   };
 
   return (
@@ -197,12 +230,20 @@ export default function MapClient() {
               <div className="flex items-center justify-between mt-2">
                 <span className="text-sm font-bold text-gray-800">{formatPrice(p.price)}</span>
                 {p.building ? (
-                  <button
-                    onClick={e => { e.stopPropagation(); openProject(p); }}
-                    className="text-xs text-orange-600 font-semibold hover:underline"
-                  >
-                    Open Project →
-                  </button>
+                  <span className="flex items-center gap-3">
+                    <button
+                      onClick={e => { e.stopPropagation(); shareProject(p); }}
+                      className={`text-xs font-semibold hover:underline ${copiedId === p.id ? 'text-green-600' : 'text-gray-500'}`}
+                    >
+                      {copiedId === p.id ? 'Link copied ✓' : 'Share'}
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); openProject(p); }}
+                      className="text-xs text-orange-600 font-semibold hover:underline"
+                    >
+                      Open Project →
+                    </button>
+                  </span>
                 ) : (
                   <span className="text-[11px] text-gray-300">No 3D model</span>
                 )}

@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import type { NextRequest } from 'next/server';
 import { guard } from '@/lib/apiGuard';
 import { Project, isProjectStatus } from '@/lib/projects';
@@ -48,6 +49,14 @@ export async function POST(request: NextRequest) {
   const projects = await readProjects();
   const existingIdx = p.id ? projects.findIndex(x => x.id === p.id) : -1;
 
+  // Share tokens are always server-minted (never taken from the payload) and
+  // survive edits. Any project with a 3D snapshot gets one, so "Share" on the
+  // map just copies the link.
+  const building = p.building ?? (existingIdx >= 0 ? projects[existingIdx].building : undefined);
+  const shareToken =
+    (existingIdx >= 0 ? projects[existingIdx].shareToken : undefined) ??
+    (building ? randomBytes(16).toString('hex') : undefined);
+
   const saved: Project = {
     id: existingIdx >= 0 ? p.id! : nextProjectId(projects),
     name: p.name.trim(),
@@ -61,7 +70,8 @@ export async function POST(request: NextRequest) {
     price: typeof p.price === 'number' && Number.isFinite(p.price) && p.price >= 0 ? Math.round(p.price) : 0,
     status: p.status,
     createdAt: existingIdx >= 0 ? projects[existingIdx].createdAt : new Date().toISOString(),
-    ...(p.building ? { building: p.building } : {}),
+    ...(building ? { building } : {}),
+    ...(shareToken ? { shareToken } : {}),
   };
 
   if (existingIdx >= 0) projects[existingIdx] = saved;

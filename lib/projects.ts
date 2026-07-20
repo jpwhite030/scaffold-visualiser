@@ -20,6 +20,8 @@ export interface Project {
   status: ProjectStatus;
   createdAt: string;      // ISO date
   building?: BuildingData; // snapshot from the visualiser, if saved from a quote
+  shareToken?: string;    // unguessable id for the public read-only 3D link;
+                          // minted server-side whenever a building snapshot exists
 }
 
 export const STATUS_META: Record<ProjectStatus, { label: string; colour: string }> = {

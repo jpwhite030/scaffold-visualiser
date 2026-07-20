@@ -18,7 +18,14 @@ Built for [Skelscaff](mailto:jack@skelscaff.com.au) on Next.js + React Three Fib
   violet), with a legend counted from the same gear-list maths. What's on
   screen is what goes on the truck.
 - **Gear list & quote** — full Kwikstage count (standards, ledgers, transoms,
-  boards, rails, jacks) and an editable, printable quote with GST.
+  boards, rails, jacks) and an editable, printable quote with GST. Creating a
+  quote snapshots the 3D model (erected + kit view) straight into the document,
+  and **Download PDF** produces a branded, client-ready PDF with the renders
+  embedded.
+- **Shareable 3D link** — every job saved with a model gets an unguessable
+  `/share/…` URL (Share button on its map card). The client gets the full
+  spin-able model, gear list and dimensions — read-only, no pricing, no way
+  into the app.
 - **Live job map** (`/map`) — every job pinned at its address on OpenStreetMap,
   coloured by status (Order / Booked In / Live / Off-Hired), with a project
   sidebar, filters, add-a-job (auto-geocoded), and "Open Project" straight into
@@ -49,3 +56,7 @@ Environment (all optional in local dev):
 - `app/map/` + `components/MapClient.tsx` — live job map
 - `app/api/projects` + `lib/projectStore.ts` — job storage (file dev / blob prod)
 - `app/api/geocode` — server-side Nominatim proxy
+- `app/share/[token]` + `app/api/share/[token]` — public read-only 3D link
+  (token-authenticated, rate-limited, returns no pricing)
+- `lib/captureRenders.ts` + `lib/quotePdf.ts` — canvas snapshots on Create
+  Quote, jsPDF quote generation
