@@ -166,6 +166,13 @@ export default function SiteReviewPage() {
       return { ...b, data: { ...b.data, gable_faces: gables } };
     });
 
+  const toggleBuildingScaffoldFace = (id: string, i: number) =>
+    updateBuilding(id, b => {
+      const faces = [...(b.data.scaffold_faces ?? Array(b.data.footprint.length).fill(true))];
+      faces[i] = !faces[i];
+      return { ...b, data: { ...b.data, scaffold_faces: faces } };
+    });
+
   // Rescale one building's footprint about its own centre
   const rescaleBuilding = (id: string, newW: number, newD: number) =>
     updateBuilding(id, b => {
@@ -407,6 +414,36 @@ export default function SiteReviewPage() {
                 </div>
               </div>
             </section>
+
+            {selectedBuilding.scaffold_enabled && (
+              <section>
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                  Scaffold Coverage
+                </h2>
+                <p className="text-xs text-gray-400 mb-3">
+                  Partial job? Untick the sides that don&apos;t need scaffold.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedBuilding.data.footprint.map((_, i) => {
+                    const on = (selectedBuilding.data.scaffold_faces ?? [])[i] ?? true;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => toggleBuildingScaffoldFace(selectedBuilding.id, i)}
+                        className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors border ${
+                          on
+                            ? 'bg-orange-500 text-white border-orange-500'
+                            : 'bg-white text-gray-400 border-gray-300 hover:border-orange-400 line-through'
+                        }`}
+                      >
+                        {faceLabel(i, selectedBuilding.data.footprint.length)} {on ? '✓' : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
             {selectedBuilding.scaffold_enabled && selectedBuilding.data.face_eave_heights && selectedBuilding.data.face_eave_heights.length > 0 && (
               <section>

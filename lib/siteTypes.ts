@@ -213,5 +213,15 @@ export function syncFaceArrays(bd: BuildingData, fp: [number, number][]): Buildi
   const syncedG = n > existingG.length
     ? [...existingG, ...Array(n - existingG.length).fill(false)]
     : existingG.slice(0, n);
-  return { ...bd, footprint: fp, face_eave_heights: synced, gable_faces: syncedG };
+  // scaffold_faces stays absent (= full wrap) until the user first toggles a side.
+  const existingS = bd.scaffold_faces;
+  const syncedS = existingS
+    ? (n > existingS.length
+        ? [...existingS, ...Array(n - existingS.length).fill(true)]
+        : existingS.slice(0, n))
+    : undefined;
+  return {
+    ...bd, footprint: fp, face_eave_heights: synced, gable_faces: syncedG,
+    ...(syncedS ? { scaffold_faces: syncedS } : {}),
+  };
 }

@@ -306,6 +306,13 @@ function buildScaffold(data: BuildingData) {
   const poly = bridgeNarrowNotches(ensureCCW(data.footprint));
   const nEdges = poly.length;
 
+  // Partial scaffold — faces unticked in review get no run at all. Absent
+  // array = full wrap (older data). Same index caveat as face_eave_heights
+  // when bridgeNarrowNotches has collapsed a notch.
+  const sf = data.scaffold_faces ?? [];
+  const faceOn = (ei: number): boolean => sf[ei] !== false;
+  const enabledEdges = Array.from({ length: nEdges }, (_, i) => i).filter(faceOn);
+
   // Mitred offset lines for the inner (0.2 m) and outer (1.4 m) standards.
   // The miter is computed for every corner — convex AND internal/re-entrant —
   // so adjacent faces share each corner point and the scaffold flows
@@ -348,8 +355,14 @@ function buildScaffold(data: BuildingData) {
     return ridgeAlongZ ? runsAlongX : !runsAlongX;   // perpendicular to the ridge
   };
 
+  if (enabledEdges.length === 0) {
+    return { tubes, boards, kickboards, rosettes, connectors, boardHooks, basePts };
+  }
+
   for (let ei = 0; ei < nEdges; ei++) {
+    if (!faceOn(ei)) continue;
     const ei1 = (ei + 1) % nEdges;
+    const prevIdx = (ei - 1 + nEdges) % nEdges;
 
     // Every corner uses the shared mitred offset point — convex and internal
     // (re-entrant) corners alike. Because the two faces meeting at a corner read
@@ -389,9 +402,9 @@ function buildScaffold(data: BuildingData) {
 
     // Corner-standard heights: a shared corner standard must reach the taller of
     // its two adjacent faces (applies to every corner now that internal corners
-    // share a standard too).
-    const prevEave = faceH(data, (ei - 1 + nEdges) % nEdges);
-    const nextEave = faceH(data, ei1);
+    // share a standard too). A scaffold-less neighbour doesn't pull the corner up.
+    const prevEave = faceOn(prevIdx) ? faceH(data, prevIdx) : 0;
+    const nextEave = faceOn(ei1) ? faceH(data, ei1) : 0;
     const tH0 = Math.max(LIFT, Math.max(eave, prevEave) - topOffset);
     const tH1 = Math.max(LIFT, Math.max(eave, nextEave) - topOffset);
 
@@ -590,6 +603,30 @@ function buildScaffold(data: BuildingData) {
         }
       }
     }
+
+    // ── End rails — a partial run stops mid-building where the neighbouring
+    // face has no scaffold. Rail that open end across the platform width at
+    // every deck level (same rail set as the long side, plus a toe board on
+    // the top deck) so nobody can walk off the end.
+    const endRot = hRot(outX, outZ);
+    const endAngle = hAngle(outX, outZ);
+    for (const [k, neighbourOn] of [[0, faceOn(prevIdx)], [numBays, faceOn(ei1)]] as [number, boolean][]) {
+      if (neighbourOn) continue;
+      const [ox, oz] = oPts[k], [ix, iz] = iPts[k];
+      const tLen = Math.hypot(ox - ix, oz - iz);
+      const cx = (ox + ix) / 2, cz = (oz + iz) / 2;
+      const endTopY = k === 0 ? bayTopYs[0] : bayTopYs[numBays - 1];
+      const deckYs = isGable
+        ? [...(hasBottomDeck ? [bottomDeckY] : []), endTopY]
+        : liftYs;
+      for (const y of deckYs) {
+        const railSet = y >= endTopY - 0.01 ? topRailYs : [RAIL_LO, RAIL_HI];
+        for (const ry of railSet) {
+          tubes.push({ x: cx, y: y + ry, z: cz, length: tLen, rot: endRot, r: RAIL_R });
+        }
+        kickboards.push({ cx, cy: y + 0.04 + KB_H / 2, cz, length: tLen, rotY: endAngle });
+      }
+    }
   }
 
   // ── Access tower — a separate 2.4 m × 1.2 m bay built OFF the run ───────────
@@ -597,7 +634,7 @@ function buildScaffold(data: BuildingData) {
   // OUTER face and projects straight out (perpendicular to the wall), with the
   // zig-zag stair (or a ladder) inside it.
   const accessType = data.access_type ?? 'stair';
-  const maxEave = Math.max(...Array.from({ length: nEdges }, (_, i) => faceH(data, i)));
+  const maxEave = Math.max(...enabledEdges.map(i => faceH(data, i)));
   const stairH  = Math.max(LIFT, maxEave - topOffset);   // reach the top deck
   // Each stair flight rises 1.5 m over a 2.4 m going (standard Kwikstage stair
   // unit); flights zig-zag until they reach the top deck height.
@@ -606,9 +643,10 @@ function buildScaffold(data: BuildingData) {
   const stairRYs = Array.from({ length: Math.ceil(stairH / 0.5) }, (_, i) => (i + 1) * 0.5)
                     .filter(y => y <= stairH + 0.01);
 
-  // Put the tower on the straightest run — the longest outer edge.
-  let ai = 0, bestLen = -1;
-  for (let i = 0; i < nEdges; i++) {
+  // Put the tower on the straightest run — the longest outer edge that
+  // actually has scaffold on it.
+  let ai = enabledEdges[0], bestLen = -1;
+  for (const i of enabledEdges) {
     const j = (i + 1) % nEdges;
     const L = Math.hypot(oPoly[j][0] - oPoly[i][0], oPoly[j][1] - oPoly[i][1]);
     if (L > bestLen) { bestLen = L; ai = i; }

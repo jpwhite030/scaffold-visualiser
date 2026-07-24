@@ -18,6 +18,10 @@ Built for [Skelscaff](mailto:jack@skelscaff.com.au) on Next.js + React Three Fib
   real ledger sizes, 2 m lifts, star rosettes every 500 mm, boarded lifts with
   toe boards, bracing, wall ties, a zig-zag stair tower (or ladder), roof-catch
   or edge protection on top.
+- **Partial coverage** — plenty of jobs are one elevation, not a full wrap:
+  untick sides in "Scaffold Coverage" on the review pages and the model only
+  scaffolds the ticked sides, closes open run-ends with end rails + toe
+  boards, and the gear list and quote price the actual run.
 - **Kit view** — one toggle recolours every tube and board by stock length
   (2.4 m yellow · 1.8 m pink · 1.2 m blue · 0.76 m green · braces teal · rails
   violet), with a legend counted from the same gear-list maths. What's on

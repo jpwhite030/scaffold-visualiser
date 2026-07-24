@@ -193,6 +193,10 @@ export function computeGearList(data: BuildingData): GearList {
   const oPoly  = offsetPolygon(poly, OUTER);
   const reflex = Array.from({ length: nEdges }, (_, i) => isReflexCorner(poly, i));
 
+  // Partial scaffold — unticked faces contribute nothing to the count.
+  const sf = data.scaffold_faces ?? [];
+  const faceOn = (ei: number): boolean => sf[ei] !== false;
+
   const gl: GearList = {
     standards:  {},
     ledgers:    {},
@@ -208,6 +212,7 @@ export function computeGearList(data: BuildingData): GearList {
   const seenPts: [number, number][] = [];  // deduplicate corner positions
 
   for (let ei = 0; ei < nEdges; ei++) {
+    if (!faceOn(ei)) continue;
     const ei1 = (ei + 1) % nEdges;
     const eNorm = edgeOutwardNormal(poly[ei], poly[ei1]);
     const op1 = reflex[ei]
@@ -238,8 +243,9 @@ export function computeGearList(data: BuildingData): GearList {
       ...liftYs,
     ])].sort((a, b) => a - b);
 
-    const prevEave = faceEave(data, (ei - 1 + nEdges) % nEdges);
-    const nextEave = faceEave(data, ei1);
+    const prevIdx  = (ei - 1 + nEdges) % nEdges;
+    const prevEave = faceOn(prevIdx) ? faceEave(data, prevIdx) : 0;
+    const nextEave = faceOn(ei1) ? faceEave(data, ei1) : 0;
     const tH0 = reflex[ei]  ? topDeckY : Math.max(LIFT, Math.max(eave, prevEave) - 1.0);
     const tH1 = reflex[ei1] ? topDeckY : Math.max(LIFT, Math.max(eave, nextEave) - 1.0);
 
@@ -297,6 +303,13 @@ export function computeGearList(data: BuildingData): GearList {
     // ── Rails, toe boards, bracing ────────────────────────────────────────────
     gl.guardrails += numBays * liftYs.length * 2;
     gl.toeBoards  += numBays * liftYs.length;
+    // End rails + toe board closing each open end of a partial run (neighbour
+    // face has no scaffold) — 2 rails and a toe per deck level.
+    for (const neighbourOn of [faceOn(prevIdx), faceOn(ei1)]) {
+      if (neighbourOn) continue;
+      gl.guardrails += liftYs.length * 2;
+      gl.toeBoards  += liftYs.length;
+    }
     // Bracing every 3 bays per Scaffold Studio rules (2 out of every 3 bays get a brace)
     const numBraceLevels = Math.max(1, Math.ceil(topDeckY / LIFT));
     gl.braces += Math.ceil(numBays * 2 / 3) * numBraceLevels;

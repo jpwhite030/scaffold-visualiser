@@ -29,6 +29,11 @@ export interface BuildingData {
   // Same indexing as face_eave_heights. False/absent = eave side (uniform height).
   gable_faces?: boolean[];
 
+  // Which faces get scaffold — partial jobs (one elevation, front + side, …)
+  // untick the rest. Same indexing as face_eave_heights. Absent = every face
+  // scaffolded, so older saved projects and share links behave unchanged.
+  scaffold_faces?: boolean[];
+
   // Access method for the scaffold tower at corner 0. Default 'stair'.
   access_type?: 'stair' | 'ladder';
 

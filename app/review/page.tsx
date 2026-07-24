@@ -83,6 +83,14 @@ export default function ReviewPage() {
     });
   };
 
+  const toggleScaffoldFace = (i: number) => {
+    setData(prev => {
+      const faces = [...(prev.scaffold_faces ?? Array(prev.footprint.length).fill(true))];
+      faces[i] = !faces[i];
+      return { ...prev, scaffold_faces: faces };
+    });
+  };
+
   // Rescale all footprint coordinates when the user corrects the overall building dimensions
   const rescaleFootprint = (newW: number, newD: number) => {
     setData(prev => {
@@ -181,7 +189,16 @@ export default function ReviewPage() {
               const syncedG = n > existingG.length
                 ? [...existingG, ...Array(n - existingG.length).fill(false)]
                 : existingG.slice(0, n);
-              return { ...prev, footprint: fp, face_eave_heights: synced, gable_faces: syncedG };
+              const existingS = prev.scaffold_faces;
+              const syncedS = existingS
+                ? (n > existingS.length
+                    ? [...existingS, ...Array(n - existingS.length).fill(true)]
+                    : existingS.slice(0, n))
+                : undefined;
+              return {
+                ...prev, footprint: fp, face_eave_heights: synced, gable_faces: syncedG,
+                ...(syncedS ? { scaffold_faces: syncedS } : {}),
+              };
             })}
           />
         </div>
@@ -202,6 +219,34 @@ export default function ReviewPage() {
                   <option value={2}>2 storeys</option>
                 </select>
               </div>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">
+              Scaffold Coverage
+            </h2>
+            <p className="text-xs text-gray-400 mb-3">
+              Partial job? Untick the sides that don&apos;t need scaffold — the model, gear list and quote only count the ticked sides.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {data.footprint.map((_, i) => {
+                const on = (data.scaffold_faces ?? [])[i] ?? true;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => toggleScaffoldFace(i)}
+                    className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors border ${
+                      on
+                        ? 'bg-orange-500 text-white border-orange-500'
+                        : 'bg-white text-gray-400 border-gray-300 hover:border-orange-400 line-through'
+                    }`}
+                  >
+                    {faceLabel(i, data.footprint.length)} {on ? '✓' : ''}
+                  </button>
+                );
+              })}
             </div>
           </section>
 

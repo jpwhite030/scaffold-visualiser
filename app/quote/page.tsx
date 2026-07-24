@@ -10,22 +10,26 @@ import SaveProjectModal from '@/components/SaveProjectModal';
 // ── Scaffold metrics ──────────────────────────────────────────────────────────
 
 interface Metrics {
-  perimeter: number;
+  perimeter: number;   // scaffolded run only — partial jobs price the run, not the building
   numLifts: number;
   maxEave: number;
+  partial: boolean;
 }
 
 function scaffoldMetrics(data: BuildingData): Metrics {
   const poly = data.footprint;
+  const sf = data.scaffold_faces ?? [];
   let perimeter = 0;
+  let partial = false;
   for (let i = 0; i < poly.length; i++) {
+    if (sf[i] === false) { partial = true; continue; }
     const [x1, z1] = poly[i];
     const [x2, z2] = poly[(i + 1) % poly.length];
     perimeter += Math.hypot(x2 - x1, z2 - z1);
   }
   const maxEave   = data.eave_height_m;
   const numLifts  = maxEave > 4.0 ? 2 : 1;
-  return { perimeter: Math.round(perimeter * 10) / 10, numLifts, maxEave };
+  return { perimeter: Math.round(perimeter * 10) / 10, numLifts, maxEave, partial };
 }
 
 function siteMetrics(site: SiteData, scaffolded: SiteData['buildings']): Metrics {
@@ -34,6 +38,7 @@ function siteMetrics(site: SiteData, scaffolded: SiteData['buildings']): Metrics
     perimeter: Math.round(per.reduce((s, m) => s + m.perimeter, 0) * 10) / 10,
     numLifts:  per.reduce((m, x) => Math.max(m, x.numLifts), 1),
     maxEave:   per.reduce((m, x) => Math.max(m, x.maxEave), 0),
+    partial:   per.some(m => m.partial),
   };
 }
 
@@ -124,13 +129,16 @@ function buildDefaultQuote(data: BuildingData): QuoteState {
     validDays:    30,
     scopeDescription:
       `Supply, erect, hire and dismantle Kwikstage scaffold to ${w}m × ${d}m ${stories}-storey residential dwelling. ` +
-      `${metrics.numLifts} lift${metrics.numLifts > 1 ? 's' : ''} to ${metrics.maxEave}m eave height, full perimeter ${metrics.perimeter}m.`,
+      `${metrics.numLifts} lift${metrics.numLifts > 1 ? 's' : ''} to ${metrics.maxEave}m eave height, ` +
+      (metrics.partial ? `partial coverage — ${metrics.perimeter}m scaffold run.` : `full perimeter ${metrics.perimeter}m.`),
     notes:
       'All prices include GST.\nPayment terms: 50% deposit on commencement, balance on completion.\nHire period commences on erection date.\nAdditional weeks charged at the weekly rate above.',
     lines: [
       {
         id:          uid(),
-        description: 'Kwikstage scaffold — erect & dismantle\nFull perimeter, ' + metrics.numLifts + ' lift' + (metrics.numLifts > 1 ? 's' : '') + ', all labour and materials',
+        description: 'Kwikstage scaffold — erect & dismantle\n' +
+          (metrics.partial ? `Partial coverage (${metrics.perimeter}m run), ` : 'Full perimeter, ') +
+          metrics.numLifts + ' lift' + (metrics.numLifts > 1 ? 's' : '') + ', all labour and materials',
         qty:         1,
         unit:        'job',
         rate:        edEst,
@@ -168,7 +176,9 @@ function buildDefaultSiteQuote(site: SiteData): QuoteState {
     hireTotal += (m.perimeter * (b.data.num_stories >= 2 ? 22 : 15));
     return {
       id: uid(),
-      description: `${b.label} — Kwikstage scaffold erect & dismantle\nFull perimeter ${m.perimeter}m, ${m.numLifts} lift${m.numLifts > 1 ? 's' : ''}, all labour and materials`,
+      description: `${b.label} — Kwikstage scaffold erect & dismantle\n` +
+        (m.partial ? `Partial coverage (${m.perimeter}m run)` : `Full perimeter ${m.perimeter}m`) +
+        `, ${m.numLifts} lift${m.numLifts > 1 ? 's' : ''}, all labour and materials`,
       qty: 1,
       unit: 'job',
       rate: Math.round((m.perimeter * edRate) / 100) * 100,
@@ -195,7 +205,7 @@ function buildDefaultSiteQuote(site: SiteData): QuoteState {
     validDays:    30,
     scopeDescription:
       `Supply, erect, hire and dismantle Kwikstage scaffold to ${targets.length} building${targets.length > 1 ? 's' : ''} — ${summary}. ` +
-      `Lot ${site.site_width_m}m × ${site.site_depth_m}m, combined perimeter ${combined.perimeter}m, max eave ${combined.maxEave}m.`,
+      `Lot ${site.site_width_m}m × ${site.site_depth_m}m, combined scaffold run ${combined.perimeter}m, max eave ${combined.maxEave}m.`,
     notes:
       'All prices include GST.\nPayment terms: 50% deposit on commencement, balance on completion.\nHire period commences on erection date.\nAdditional weeks charged at the weekly rate above.',
     lines,
